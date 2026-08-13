@@ -101,11 +101,28 @@ runs:
         if [ -z "$base" ]; then
           base="origin/$PR_BASE_REF"
         fi
-        # Full fetch, not a shallow one: a shallow fetch can miss the merge
-        # base on a branch with many commits since it diverged, and the
-        # scope would then silently degrade instead of failing loudly.
-        # Matches the fetch-depth: 0 checkout in the README example.
-        git fetch --quiet origin "$PR_BASE_REF" || true
+        if [ -n "$PR_BASE_REF" ]; then
+          git fetch --quiet origin "$PR_BASE_REF" || true
+        fi
+
+        # A shallow checkout can leave the merge-base with $base unreachable.
+        # Left unchecked, `git diff` silently falls back to some other commit
+        # and the mutation scope quietly drifts to the tip of the base branch
+        # instead of the real fork point — noisy mutants, wasted LLM spend,
+        # and nothing in the logs to explain why. Verify the merge-base is
+        # actually reachable, unshallow once if it is not, and fail loudly
+        # rather than mutate the wrong range of commits.
+        if ! git merge-base HEAD "$base" >/dev/null 2>&1; then
+          git fetch --quiet --unshallow origin 2>/dev/null \
+            || git fetch --quiet --depth=1000000 origin
+          if [ -n "$PR_BASE_REF" ]; then
+            git fetch --quiet origin "$PR_BASE_REF" || true
+          fi
+          if ! git merge-base HEAD "$base" >/dev/null 2>&1; then
+            echo "::error::could not find a merge-base with '$base' even after a full fetch. Checkout this action with fetch-depth: 0 (actions/checkout with: fetch-depth: 0)."
+            exit 1
+          fi
+        fi
 
         args=(run --base "$base"
               --max-mutants "$INPUT_MAX_MUTANTS"
