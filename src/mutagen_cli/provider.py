@@ -224,9 +224,11 @@ class AnthropicProvider:
 
     def complete_json(self, system: str, user: str, schema: dict) -> Reply:
         # The provider name is part of the cache key: identical prompts to two
-        # providers must not share an entry.
+        # providers must not share an entry. max_tokens too — a lower limit
+        # can truncate the reply, and a later run with a higher limit must
+        # not replay that truncated answer.
         cache_key = Cache.key(
-            self.provider_name, self.model, self.effort, system, user,
+            self.provider_name, self.model, self.effort, str(self.max_tokens), system, user,
             json.dumps(schema, sort_keys=True),
         )
         if self.cache:
@@ -344,9 +346,11 @@ class OpenRouterProvider:
         # The provider name is part of the cache key: identical prompts to two
         # providers must not share an entry. So is the reasoning toggle — it
         # changes the reply, and it is the OpenRouter analogue of `effort`.
+        # max_tokens too — a lower limit can truncate the reply, and a later
+        # run with a higher limit must not replay that truncated answer.
         cache_key = Cache.key(
             self.provider_name, self.model, reasoning_tag(self.reasoning),
-            system, user, json.dumps(schema, sort_keys=True),
+            str(self.max_tokens), system, user, json.dumps(schema, sort_keys=True),
         )
         if self.cache:
             hit = self.cache.get(cache_key)

@@ -178,7 +178,7 @@ def test_cache_key_includes_the_provider(tmp_path):
     # Same model id on the Anthropic side must miss the OpenRouter entry.
     anthropic = AnthropicProvider(model="shared-model-name", api_key="sk-ant", cache=cache)
     assert anthropic.cache.get(
-        Cache.key("anthropic", "shared-model-name", "medium", "sys", "user",
+        Cache.key("anthropic", "shared-model-name", "medium", "16000", "sys", "user",
                   json.dumps(MUTANT_SCHEMA, sort_keys=True))
     ) is None
 
@@ -190,6 +190,23 @@ def test_cache_key_includes_the_provider(tmp_path):
     second = cached.complete_json("sys", "user", MUTANT_SCHEMA)
     assert second.from_cache
     assert second.data == PAYLOAD
+
+
+def test_max_tokens_change_does_not_replay_a_truncated_cache_entry(tmp_path):
+    # A run capped at a low max_tokens can truncate the reply. If max_tokens
+    # were not in the cache key, a later run with a higher limit would replay
+    # that truncated answer instead of asking the model again.
+    cache = Cache(tmp_path, enabled=True)
+    low = make_provider(ok_handler, cache=cache, max_tokens=100)
+    assert not low.complete_json("sys", "user", MUTANT_SCHEMA).from_cache
+    assert low.complete_json("sys", "user", MUTANT_SCHEMA).from_cache
+
+    def boom(request):  # pragma: no cover - a hit here is the bug
+        raise AssertionError("max_tokens=4000 reused the max_tokens=100 entry")
+
+    high = make_provider(boom, cache=cache, max_tokens=4000)
+    with pytest.raises(AssertionError):
+        high.complete_json("sys", "user", MUTANT_SCHEMA)
 
 
 def test_reasoning_toggle_does_not_share_a_cache_entry(tmp_path):

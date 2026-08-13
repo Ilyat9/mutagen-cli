@@ -26,7 +26,9 @@ def seed(repo, plan, max_mutants=25, max_files=20):
         payload = {"mutants": plan.get(target.qualname, [])}
         user = mutant_user(target, read_test_context(repo, target), per_target)
         cache.put(
-            Cache.key("openrouter", MODEL, reasoning_tag(False), MUTANT_SYSTEM, user, schema),
+            Cache.key(
+                "openrouter", MODEL, reasoning_tag(False), "16000", MUTANT_SYSTEM, user, schema
+            ),
             {"data": payload},
         )
 
