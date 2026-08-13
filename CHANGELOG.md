@@ -4,6 +4,60 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
+## 0.1.1 — 2026-08-14
+
+Fixes from an independent pre-marketplace-launch audit of 0.1.0. Published to
+PyPI (0.1.0 stays as-is — PyPI does not allow re-uploading a version).
+
+- **`[security]` pytest subprocesses no longer inherit mutagen's own
+  credentials.** `run_pytest` used to hand every mutant's test run the full
+  parent environment, including `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY` and
+  `GITHUB_TOKEN`. On the GitHub Action the code under test is a pull request's
+  own — untrusted — code, which could read a secret out of `os.environ` or
+  leak one into an assertion failure that then lands in the PR comment.
+  `SECRET_ENV_VARS` is now stripped from every pytest subprocess's
+  environment before it starts. Regression test:
+  `test_pytest_subprocess_does_not_see_mutagens_secrets`.
+- **`coverage` is now a direct dependency**, not just a `dev`-extra transitive
+  one. `coverage_map.load()` runs `import coverage` inside *mutagen's own*
+  interpreter to read the data file the instrumented baseline wrote — a plain
+  `pip install mutagen-cli` never pulled that in, so a user with `pytest-cov`
+  correctly installed in their own project venv still hit a silent
+  `ImportError`, fell back to the heuristic mapping, and got told to "install
+  pytest-cov" even though it already was. Regression test:
+  `test_coverage_is_a_direct_dependency_not_only_a_dev_extra`.
+- **A prose reply whose first `{...}` fragment isn't the real payload no
+  longer produces a silent empty result.** `extract_json`'s raw_decode
+  fallback returned the first balanced JSON object it found in free-form
+  text, even one missing the caller's required keys (e.g. `mutants`) — the
+  generator's `.get("mutants", [])` then quietly returned `[]` and the run
+  reported "the model returned no usable mutants" with no indication why.
+  `extract_json` now takes the schema's `required` keys and keeps scanning
+  (or raises `ProviderError`) until it finds an object that actually has
+  them. Regression tests:
+  `test_extract_json_rejects_a_wrong_shaped_object_instead_of_going_silent`,
+  `test_openrouter_provider_raises_on_reply_missing_the_mutants_key`.
+- **`action.yml` hardening:**
+  - `pip install mutagen-cli` is now pinned to `==0.1.1`, so the mutation
+    gate is reproducible instead of picking up whatever is newest at build
+    time.
+  - Every `${{ inputs.* }}` / `${{ github.* }}` value used inside a bash
+    `run:` block is now passed through `env:` and read back as a shell
+    variable, rather than templated directly into the script text.
+  - `--effort` is only passed to `mutagen` when `provider: anthropic` — it is
+    a dead argument on OpenRouter.
+- **Docs synced to the actual repo state:** README's test count (74 → 90,
+  after this release's new regression tests) now matches the CHANGELOG's;
+  the CHANGELOG's claim that the Action "defaults to anthropic" is corrected
+  to `openrouter`, matching `action.yml`; the README's "tested on three
+  independent projects" heading is now "three other real projects" — all
+  three are the author's own repos, not independent ones; the quickstart
+  gains a `mutagen run --all --max-mutants 5` line for trying the tool on a
+  clean tree, where a plain `mutagen run` has nothing to diff against and
+  prints "Nothing to mutate"; the Anthropic provider section notes that path
+  is less battle-tested live than OpenRouter, since every live run recorded
+  in BENCHMARKS.md went through OpenRouter.
+
 ## 0.1.0 — 2026-08-13
 
 Published to PyPI: <https://pypi.org/project/mutagen-cli/0.1.0/>.
@@ -32,9 +86,9 @@ Published to PyPI: <https://pypi.org/project/mutagen-cli/0.1.0/>.
   price table; `{"prices": {"model/id": [in, out]}}` in the config overrides
   it. A model with no known price is reported as **"cost unavailable"** instead
   of a misleading $0. The JSON report gains `usage.unpriced_calls`.
-- The GitHub Action takes a `provider` input (still defaults to `anthropic`
-  there, so existing workflows don't break) and an `openrouter-api-key` input;
-  its `model` input now defaults to the provider's default.
+- The GitHub Action takes a `provider` input (defaults to `openrouter`, same
+  as the CLI) and an `openrouter-api-key` input; its `model` input now
+  defaults to the provider's default.
 - `mutagen run` — diffs the working tree against the merge base with `main`,
   maps the changed lines to whole functions via `ast`, and mutates only those.
 - `--all`, `--path`, `--base` for the other scopes; `--max-mutants`,

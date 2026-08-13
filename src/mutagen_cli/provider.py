@@ -138,11 +138,18 @@ def missing_key_error(provider: str) -> str:
     )
 
 
-def extract_json(text: str) -> object:
+def extract_json(text: str, required: Optional[list] = None) -> object:
     """Parse JSON out of a model reply that may not be bare JSON.
 
     Tolerates markdown fences and prose around the payload — models without
     schema-constrained output sometimes prepend reasoning or wrap the answer.
+
+    `required` are the top-level keys the caller's schema demands (its own
+    "required" list). The raw_decode fallback below finds the first balanced
+    `{...}` in free-form prose, which can be some other JSON-looking fragment
+    the model wrote before the real answer; without this check that object is
+    returned as-is, the caller's `.get("mutants", [])` sees no such key,
+    quietly gets `[]`, and generation ends with zero mutants and no error.
     """
     text = text.strip()
     if text.startswith("```"):
@@ -151,8 +158,14 @@ def extract_json(text: str) -> object:
         if lines and lines[-1].strip().startswith("```"):
             lines = lines[:-1]
         text = "\n".join(lines).strip()
+
+    def _valid(data: object) -> bool:
+        return not required or (isinstance(data, dict) and all(k in data for k in required))
+
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if _valid(data):
+            return data
     except json.JSONDecodeError:
         pass
     # Fall back to the first balanced JSON object in the text.
@@ -163,8 +176,10 @@ def extract_json(text: str) -> object:
                 data, _ = decoder.raw_decode(text[index:])
             except json.JSONDecodeError:
                 continue
-            return data
-    raise ProviderError("model returned unparseable JSON")
+            if _valid(data):
+                return data
+    keys = f" missing {required}" if required else ""
+    raise ProviderError(f"model returned unparseable JSON{keys}")
 
 
 class AnthropicProvider:
@@ -358,7 +373,7 @@ class OpenRouterProvider:
         message = (body.get("choices") or [{}])[0].get("message") or {}
         # `reasoning` / `reasoning_details` fields, when present, are ignored —
         # only `content` carries the answer.
-        data = extract_json(message.get("content") or "")
+        data = extract_json(message.get("content") or "", required=schema.get("required"))
 
         if self.cache:
             self.cache.put(cache_key, {"data": data})

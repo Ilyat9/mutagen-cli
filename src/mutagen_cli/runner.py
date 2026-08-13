@@ -24,6 +24,13 @@ from .scope import SKIP_DIRS
 EXIT_OK = 0
 EXIT_TESTS_FAILED = 1
 
+# Test code in the mutated repo is untrusted — on the GitHub Action it is
+# whatever a pull request author wrote. mutagen's own credentials have no
+# business being readable from inside a pytest subprocess: a test could print
+# one into an assertion failure, which we then capture and put in a PR
+# comment. Strip them rather than trust the test suite not to look.
+SECRET_ENV_VARS = ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN")
+
 
 @dataclass
 class RunnerConfig:
@@ -82,6 +89,8 @@ def run_pytest(
     # invalidates on mtime+size, so the stale bytecode is reused and the mutant
     # silently never runs. That would report a survivor that isn't one.
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    for var in SECRET_ENV_VARS:
+        env.pop(var, None)
     # A src-layout project installed editable (pip install -e .) adds the
     # ORIGINAL tree to sys.path via a .pth in site-packages, so tests in the
     # worker copy import unmutated code and every mutant looks like a survivor.

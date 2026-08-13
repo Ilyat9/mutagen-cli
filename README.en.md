@@ -20,7 +20,7 @@ Real output, excerpted from a run against a third-party repo
 
 <img src="assets/mutagen_report.svg" alt="mutagen run: mutation score 21%, two survivors — a spaCy pipeline cache that doesn't key by language, and swapped classification thresholds" width="900">
 
-## Tested on three independent projects
+## Tested on three other real-world projects
 
 Not just the bundled fixture — three real apps with pre-existing, already-green
 test suites, no source changes made for the tool's sake:

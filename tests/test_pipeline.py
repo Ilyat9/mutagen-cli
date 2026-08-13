@@ -311,3 +311,24 @@ def test_invent_apply_only_writes_verified_tests(victim_repo, tmp_path):
     written = list((victim_repo / "tests" / "mutagen_generated").glob("*.py"))
     assert len(written) == 1
     assert "apply_discount" in written[0].read_text()
+
+
+def test_pytest_subprocess_does_not_see_mutagens_secrets(victim_repo, tmp_path, monkeypatch):
+    # Test code in the mutated repo is untrusted (a pull request's own code on
+    # the GitHub Action) and must not be able to read mutagen's own API keys
+    # or the token used to post PR comments out of its environment.
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-secret")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-secret")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp-secret")
+
+    workdir = sandbox(victim_repo, tmp_path)
+    probe = workdir / "tests" / "test_probe_env.py"
+    probe.write_text(
+        "import os\n\n"
+        "def test_secrets_are_not_in_the_environment():\n"
+        "    for var in ('OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'GITHUB_TOKEN'):\n"
+        "        assert var not in os.environ\n",
+        encoding="utf-8",
+    )
+    code, output, _ = run_pytest(workdir, sys.executable, ["tests/test_probe_env.py"], 30.0)
+    assert code == 0, output

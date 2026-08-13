@@ -59,9 +59,16 @@ outputs:
 runs:
   using: composite
   steps:
+    # Note: mutagen strips OPENROUTER_API_KEY, ANTHROPIC_API_KEY and
+    # GITHUB_TOKEN from the environment of every pytest subprocess it spawns,
+    # so a test from an untrusted pull request cannot read or leak them. On a
+    # fork PR still turn on "required approval for first-time contributors"
+    # (Settings > Actions > General), as for any CI job that runs a PR's code.
     - name: Install mutagen
       shell: bash
-      run: pip install --quiet mutagen-cli
+      # Pinned so the mutation gate is reproducible across runs and cannot
+      # silently pick up a new release mid-rollout.
+      run: pip install --quiet mutagen-cli==0.1.1
 
     - name: Run mutagen
       id: mutate
@@ -69,24 +76,40 @@ runs:
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         OPENROUTER_API_KEY: ${{ inputs.openrouter-api-key }}
+        # Interpolated into env rather than directly into the script: an
+        # ${{ }} expression substituted straight into `run:` is textual and,
+        # for attacker-influenced values (base ref, PR fields), can break out
+        # of its quoting. Reading it back as a shell variable is safe because
+        # the shell, not the workflow templater, is what expands it.
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_MAX_MUTANTS: ${{ inputs.max-mutants }}
+        INPUT_PROVIDER: ${{ inputs.provider }}
+        INPUT_EFFORT: ${{ inputs.effort }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_INVENT: ${{ inputs.invent }}
+        PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
       run: |
         set -o pipefail
-        base="${{ inputs.base }}"
+        base="$INPUT_BASE"
         if [ -z "$base" ]; then
-          base="origin/${{ github.event.pull_request.base.ref }}"
+          base="origin/$PR_BASE_REF"
         fi
-        git fetch --quiet origin "${{ github.event.pull_request.base.ref }}" --depth=200 || true
+        git fetch --quiet origin "$PR_BASE_REF" --depth=200 || true
 
         args=(run --base "$base"
-              --max-mutants "${{ inputs.max-mutants }}"
-              --provider "${{ inputs.provider }}"
-              --effort "${{ inputs.effort }}"
+              --max-mutants "$INPUT_MAX_MUTANTS"
+              --provider "$INPUT_PROVIDER"
               --report-md mutagen-report.md
               --report-json mutagen-report.json)
-        if [ -n "${{ inputs.model }}" ]; then
-          args+=(--model "${{ inputs.model }}")
+        if [ "$INPUT_PROVIDER" = "anthropic" ]; then
+          # --effort is an Anthropic-only knob; OpenRouter ignores it, so
+          # sending it there would just be a dead, confusing argument.
+          args+=(--effort "$INPUT_EFFORT")
         fi
-        if [ "${{ inputs.invent }}" = "true" ]; then
+        if [ -n "$INPUT_MODEL" ]; then
+          args+=(--model "$INPUT_MODEL")
+        fi
+        if [ "$INPUT_INVENT" = "true" ]; then
           args+=(--invent)
         fi
 
@@ -110,29 +133,34 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
       run: |
         [ -f mutagen-report.md ] || exit 0
         marker='<!-- mutagen-report -->'
         { echo "$marker"; cat mutagen-report.md; } > comment.md
 
-        number="${{ github.event.pull_request.number }}"
-        existing=$(gh api "repos/${{ github.repository }}/issues/$number/comments" \
+        existing=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
           --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty")
 
         if [ -n "$existing" ]; then
-          gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$existing" \
+          gh api -X PATCH "repos/$REPO/issues/comments/$existing" \
             -F body=@comment.md >/dev/null
         else
-          gh api -X POST "repos/${{ github.repository }}/issues/$number/comments" \
+          gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" \
             -F body=@comment.md >/dev/null
         fi
 
     - name: Apply the gate
       shell: bash
+      env:
+        INPUT_FAIL_UNDER: ${{ inputs.fail-under }}
+        MUTATE_SCORE: ${{ steps.mutate.outputs.score }}
+        MUTATE_EXIT_CODE: ${{ steps.mutate.outputs.exit-code }}
       run: |
-        threshold="${{ inputs.fail-under }}"
-        score="${{ steps.mutate.outputs.score }}"
-        code="${{ steps.mutate.outputs.exit-code }}"
+        threshold="$INPUT_FAIL_UNDER"
+        score="$MUTATE_SCORE"
+        code="$MUTATE_EXIT_CODE"
 
         if [ "$code" != "0" ] && [ "$code" != "1" ]; then
           echo "::error::mutagen failed to run (exit $code)"

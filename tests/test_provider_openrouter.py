@@ -217,6 +217,32 @@ def test_extract_json_tolerates_prose_and_fences():
         extract_json("no json at all")
 
 
+def test_extract_json_rejects_a_wrong_shaped_object_instead_of_going_silent():
+    # A prose reply whose first balanced {...} is not the real payload (e.g. a
+    # model musing "I'll check {status: ...}" before the answer) must not be
+    # handed back as if it were valid — the caller's `.get("mutants", [])`
+    # would see no such key, silently get [], and generation would end with
+    # zero mutants and no error at all.
+    with pytest.raises(ProviderError):
+        extract_json('{"status": "thinking"}', required=["mutants"])
+    # A later, correctly-shaped object in the same text is still found — only
+    # a reply with no valid object anywhere is an error.
+    assert extract_json(
+        'musing {"status": "thinking"} then {"mutants": []}',
+        required=["mutants"],
+    ) == {"mutants": []}
+    assert extract_json('{"mutants": []}', required=["mutants"]) == {"mutants": []}
+
+
+def test_openrouter_provider_raises_on_reply_missing_the_mutants_key():
+    def handler(request):
+        return httpx.Response(200, json=openai_response('{"status": "thinking"}'))
+
+    provider = make_provider(handler)
+    with pytest.raises(ProviderError):
+        provider.complete_json("sys", "user", MUTANT_SCHEMA)
+
+
 def test_resolve_api_key_prefers_env_then_config(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-env")
     assert resolve_api_key("openrouter", tmp_path) == "sk-or-env"
