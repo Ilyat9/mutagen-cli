@@ -4,6 +4,37 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
+## 0.1.2 — 2026-08-14
+
+- **`[improvement]` Benchmarked against two independent third-party
+  repositories, not just the author's own projects.** Ran `mutagen run --all`
+  against [parse](https://github.com/r1chardj0n3s/parse) (1.8k★) and
+  [parsy](https://github.com/python-parsy/parsy) (451★) — neither owned by
+  the author, both cloned read-only with their pre-existing suites left
+  untouched. Scores land at 68% and 75%, well above the 4–24% range seen on
+  the author's own code, which is the expected direction: mature, reviewed
+  test suites should score higher, not the same. Full survivor-by-survivor
+  breakdown, manually verified, in BENCHMARKS.md Run G; raw reports in
+  `benchmarks/data/{parse,parsy}_report.{md,json}`.
+- Full history is now fetched in `action.yml` instead of `--depth=200`, which
+  silently missed the merge-base on branches that diverged from `main` more
+  than 200 commits ago.
+- The mutant report now surfaces a "multiple exact matches" condition in the
+  per-mutant detail instead of discarding it silently after the patch is
+  applied.
+- `max_tokens` is now part of the LLM cache key — raising the limit used to
+  silently replay a reply that was cached under the old, lower limit and
+  truncated accordingly.
+- `.mutagen/` is now gitignored the moment its cache directory is first
+  created, not only if a `.gitignore` already existed — the cache holds raw
+  prompts and replies, i.e. the user's own code.
+- Docs now warn against `pull_request_target` for the CI mutation gate and
+  flag the prompt-injection risk of feeding an LLM-generated report from an
+  untrusted PR back into a privileged workflow.
+- `[improvement]` Added regression coverage for `AnthropicProvider.complete_json`
+  (request shape, cache key, cost accounting, and that temperature/top_p/top_k
+  and reasoning are never sent — the current Anthropic models reject them).
+
 ## 0.1.1 — 2026-08-14
 
 Fixes from an independent pre-marketplace-launch audit of 0.1.0. Published to

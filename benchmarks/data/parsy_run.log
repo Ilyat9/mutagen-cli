@@ -1,0 +1,117 @@
+
+64 function(s) in 1 file(s) → up to 25 mutants, 9 LLM call(s) with 
+anthropic/claude-sonnet-5
+20 function(s) have no matching test file; those mutants will run the full 
+suite.
+mapping: coverage (64/64 function(s) mapped from a 0.9s instrumented baseline)
+
+
+
+╭───────────────────────────────────────────────────────╮
+│ mutation score  75%   (18 killed / 24 viable mutants) │
+╰───────────────────────────────────────────────────────╯
+
+file                   killed  survived  score
+src/parsy/__init__.py      18         6    75%
+
+6 bugs your tests would not catch
+
+╭───────────────────────────────── survivor 1 ─────────────────────────────────╮
+│ Swallows unrelated errors like ValueError or IndexError from line_info_at    │
+│ instead of letting them propagate, masking real bugs in edge cases.          │
+│ src/parsy/__init__.py::ParseError.line_info   [swallowed_error]              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- src/parsy/__init__.py
++++ src/parsy/__init__.py (mutated)
+@@ -31,5 +31,5 @@
+         try:
+             return "{}:{}".format(*line_info_at(self.stream, self.index))
+-        except (TypeError, AttributeError):  # not a str
++        except Exception:  # not a str
+             return str(self.index)
+ 
+
+╭───────────────────────────────── survivor 2 ─────────────────────────────────╮
+│ When there are zero expected tokens, the code still tries to format a        │
+│ single-expectation message and crashes or shows a broken message instead of  │
+│ a sensible fallback.                                                         │
+│ src/parsy/__init__.py::ParseError.__str__   [boundary_condition]             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- src/parsy/__init__.py
++++ src/parsy/__init__.py (mutated)
+@@ -37,5 +37,5 @@
+         expected_list = sorted(repr(e) for e in self.expected)
+ 
+-        if len(expected_list) == 1:
++        if len(expected_list) <= 1:
+             return f"expected {expected_list[0]} at {self.line_info()}"
+         else:
+
+╭───────────────────────────────── survivor 3 ─────────────────────────────────╮
+│ A successful parse result records the wrong furthest-failure index, which    │
+│ can cause incorrect error reporting when combined with other parsers in      │
+│ alternatives.                                                                │
+│ src/parsy/__init__.py::Result.success   [wrong_default]                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- src/parsy/__init__.py
++++ src/parsy/__init__.py (mutated)
+@@ -53,5 +53,5 @@
+     @staticmethod
+     def success(index, value) -> Result:
+-        return Result(True, index, value, -1, frozenset())
++        return Result(True, index, value, index, frozenset())
+ 
+     @staticmethod
+
+╭───────────────────────────────── survivor 4 ─────────────────────────────────╮
+│ Failure results always report success-index -1 correctly, but the expected   │
+│ value is wrapped in a set even when None is passed, causing merged error     │
+│ messages to include a spurious 'None' entry instead of being omitted         │
+│ src/parsy/__init__.py::Result.failure   [wrong_default]                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- src/parsy/__init__.py
++++ src/parsy/__init__.py (mutated)
+@@ -57,5 +57,5 @@
+     @staticmethod
+     def failure(index, expected) -> Result:
+-        return Result(False, -1, None, index, frozenset([expected]))
++        return Result(False, -1, None, index, frozenset([expected]) if expected
+ 
+     # collect the furthest failure from self and other
+
+╭───────────────────────────────── survivor 5 ─────────────────────────────────╮
+│ Aggregating a falsy-but-present other result (e.g. one with furthest==0 or   │
+│ empty expected set) is incorrectly treated as if there were no other result  │
+│ to combine, silently dropping information about that failure.                │
+│ src/parsy/__init__.py::Result.aggregate   [none_handling]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- src/parsy/__init__.py
++++ src/parsy/__init__.py (mutated)
+@@ -61,5 +61,5 @@
+     # collect the furthest failure from self and other
+     def aggregate(self, other) -> Result:
+-        if not other:
++        if other is None:
+             return self
+ 
+
+╭───────────────────────────────── survivor 6 ─────────────────────────────────╮
+│ Parsers built via subclassing or composition end up sharing a single mutable │
+│ default wrapped function instead of the one actually passed in, causing      │
+│ unrelated parsers to behave identically.                                     │
+│ src/parsy/__init__.py::Parser.__init__   [wrong_default]                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- src/parsy/__init__.py
++++ src/parsy/__init__.py (mutated)
+@@ -95,5 +95,5 @@
+         and returns a Result.
+         """
+-        self.wrapped_fn = wrapped_fn
++        self.wrapped_fn = wrapped_fn or string("")
+ 
+     def __call__(self, stream: str | bytes | list, index: int) -> Any:
+
+18 killed  6 survived  1 timeout
+10 LLM calls (anthropic/claude-sonnet-5)  ~$0.129  in 94.5s
+markdown report → report.md
+json report → report.json

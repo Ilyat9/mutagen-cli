@@ -75,7 +75,7 @@ runs:
       shell: bash
       # Pinned so the mutation gate is reproducible across runs and cannot
       # silently pick up a new release mid-rollout.
-      run: pip install --quiet mutagen-cli==0.1.1
+      run: pip install --quiet mutagen-cli==0.1.2
 
     - name: Run mutagen
       id: mutate

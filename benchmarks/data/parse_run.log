@@ -1,0 +1,150 @@
+
+46 function(s) in 1 file(s) → up to 25 mutants, 9 LLM call(s) with 
+anthropic/claude-sonnet-5
+12 function(s) have no matching test file; those mutants will run the full 
+suite.
+mapping: coverage (46/46 function(s) mapped from a 1.1s instrumented baseline; 3
+reached by no test)
+
+
+
+╭───────────────────────────────────────────────────────╮
+│ mutation score  68%   (17 killed / 25 viable mutants) │
+╰───────────────────────────────────────────────────────╯
+
+file               killed  survived  score
+parse/__init__.py      17         8    68%
+
+7 bugs your tests would not catch
+
+╭───────────────────────────────── survivor 1 ─────────────────────────────────╮
+│ Numbers with a '0x', '0o', or '0b' prefix are misdetected as decimal when    │
+│ the sign character shifts the prefix position, causing incorrect base        │
+│ selection for signed hex/octal/binary literals                               │
+│ parse/__init__.py::int_convert.__call__   [off_by_one]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -86,5 +86,5 @@
+ 
+             # For number formats starting with 0b, 0o, 0x, use corresponding ba
+-            if string[number_start] == "0" and len(string) - number_start > 2:
++            if string[number_start] == "0" and len(string) - number_start >= 2:
+                 if string[number_start + 1] in "bB":
+                     base = 2
+
+╭───────────────────────────────── survivor 2 ─────────────────────────────────╮
+│ Empty matched strings are now converted to None before reaching the user's   │
+│ converter, so custom converters never see empty-string input even when they  │
+│ should handle it themselves.                                                 │
+│ parse/__init__.py::convert_first.__call__   [empty_input]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -108,4 +108,6 @@
+ 
+     def __call__(self, string, match):
++        if not string:
++            return None
+         return self.converter(string)
+ 
+
+╭───────────────────────────────── survivor 3 ─────────────────────────────────╮
+│ Timezone offset stored in seconds is silently treated as minutes, so any     │
+│ FixedTzOffset built with a non-zero offset represents the wrong UTC delta.   │
+│ parse/__init__.py::FixedTzOffset.__init__   [wrong_operator]                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -121,5 +121,5 @@
+ 
+     def __init__(self, offset, name):
+-        self._offset = timedelta(minutes=offset)
++        self._offset = timedelta(minutes=offset) if offset == 0 else timedelta(
+         self._name = name
+ 
+
+╭───────────────────────────────── survivor 4 ─────────────────────────────────╮
+│ The offset sign gets flipped, so timezones east of UTC are recorded as west  │
+│ and vice versa.                                                              │
+│ parse/__init__.py::FixedTzOffset.__init__   [wrong_operator]                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -121,5 +121,5 @@
+ 
+     def __init__(self, offset, name):
+-        self._offset = timedelta(minutes=offset)
++        self._offset = timedelta(minutes=-offset)
+         self._name = name
+ 
+
+╭───────────────────────────────── survivor 5 ─────────────────────────────────╮
+│ The timezone name is stored but silently lowercased/altered, so display and  │
+│ equality checks relying on the original name text fail.                      │
+│ parse/__init__.py::FixedTzOffset.__init__   [other]                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -122,5 +122,5 @@
+     def __init__(self, offset, name):
+         self._offset = timedelta(minutes=offset)
+-        self._name = name
++        self._name = name.upper() if name else name
+ 
+     def __repr__(self):
+
+╭───────────────────────────────── survivor 6 ─────────────────────────────────╮
+│ UTC-tagged datetimes end up with a timezone offset different from zero,      │
+│ shifting parsed times that use the 'Z' suffix by a small constant amount     │
+│ instead of none.                                                             │
+│ parse/__init__.py::FixedTzOffset.utcoffset   [wrong_operator]                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -128,5 +128,5 @@
+ 
+     def utcoffset(self, dt):
+-        return self._offset
++        return self._offset + timedelta(minutes=1)
+ 
+     def tzname(self, dt):
+
+╭───────────────────────────────── survivor 7 ─────────────────────────────────╮
+│ Calling utcoffset always returns None regardless of the configured offset,   │
+│ breaking timezone-aware datetime comparisons and arithmetic.                 │
+│ parse/__init__.py::FixedTzOffset.utcoffset   [missing_return]                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -128,5 +128,5 @@
+ 
+     def utcoffset(self, dt):
+-        return self._offset
++        pass
+ 
+     def tzname(self, dt):
+
+1 mutant(s) in code no test executes at all
+Not a weak assertion — an absence. No test reaches these lines, so nothing here 
+could ever have failed.
+
+╭──────────────────────────────── unreached 1 ─────────────────────────────────╮
+│ The timezone name lookup always returns None instead of the configured name, │
+│ breaking display of timezone abbreviations.                                  │
+│ parse/__init__.py::FixedTzOffset.tzname   [wrong_default]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- parse/__init__.py
++++ parse/__init__.py (mutated)
+@@ -131,5 +131,5 @@
+ 
+     def tzname(self, dt):
+-        return self._name
++        return None
+ 
+     def dst(self, dt):
+
+17 killed  8 survived (1 of them unreached by any test)
+11 LLM calls (anthropic/claude-sonnet-5)  ~$0.133  in 69.1s
+markdown report → report.md
+json report → report.json

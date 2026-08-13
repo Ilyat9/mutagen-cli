@@ -20,10 +20,11 @@ Real output, excerpted from a run against a third-party repo
 
 <img src="assets/mutagen_report.svg" alt="mutagen run: mutation score 21%, two survivors — a spaCy pipeline cache that doesn't key by language, and swapped classification thresholds" width="900">
 
-## Tested on three other real-world projects
+## Tested on five other real-world projects
 
-Not just the bundled fixture — three real apps with pre-existing, already-green
-test suites, no source changes made for the tool's sake:
+Not just the bundled fixture — real apps with pre-existing, already-green
+test suites, no source changes made for the tool's sake. Three are my own
+projects; two are unrelated third-party libraries:
 
 | Project | Scope | Score | Cost |
 | --- | --- | ---: | ---: |
@@ -31,11 +32,28 @@ test suites, no source changes made for the tool's sake:
 | [cityfeed](https://github.com/Ilyat9/cityfeed) — Telegram news-digest bot | `rank/` | **20%** (5/25) | $0.13 |
 | [cityfeed](https://github.com/Ilyat9/cityfeed) | `dedup/` | **24%** (6/25) | $0.14 |
 | [CogniWeb_Agent](https://github.com/Ilyat9/CogniWeb_Agent) — browser LLM agent | 3 modules, 3 runs | 12% / 5% / 4% | $0.78 |
+| [parse](https://github.com/r1chardj0n3s/parse) — reverse of str.format, 1.8k★ | `parse/__init__.py` | **68%** (17/25) | $0.13 |
+| [parsy](https://github.com/python-parsy/parsy) — parser combinators, 451★ | `src/parsy/__init__.py` | **75%** (18/24) | $0.13 |
 
-All four land under 25% on code that already had human review and a green CI —
-a language-blind pipeline cache, swapped threshold values, boundary conditions
-at window edges, inverted security checks. Not one codebase's quirk; the same
-shape of blind spot each time.
+The four owned projects all land under 25% on code that already had human
+review and a green CI — a language-blind pipeline cache, swapped threshold
+values, boundary conditions at window edges, inverted security checks. Not
+one codebase's quirk; the same shape of blind spot each time.
+
+To check this isn't just self-flattery, mutagen-cli was also run against two
+unrelated open-source libraries — [parse](https://github.com/r1chardj0n3s/parse)
+(the reverse of `str.format()`, 1.8k★, MIT) and
+[parsy](https://github.com/python-parsy/parsy) (parser combinators, 451★,
+MIT) — both with pre-existing green pytest suites, no source changes made.
+Scores there are noticeably higher: 68% and 75%, versus 4–24% on my own
+projects — mature code with years of review and more contributors does close
+more mutations, which is the expected direction: mutation score should track
+coverage quality, not sit at a constant. But real gaps still show up, just
+concentrated rather than smeared across the module: in parse, all 7 live
+survivors cluster around `FixedTzOffset` (timezone handling is systematically
+under-covered) plus one off-by-one on signed hex/octal/binary literals; in
+parsy, all 6 sit in the error-reporting meta-logic (`ParseError`/`Result`: a
+swallowed exception, a wrong boundary, a lost furthest-index).
 
 ## Quickstart
 

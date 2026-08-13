@@ -372,6 +372,106 @@ forces `COVERAGE_CORE=ctrace` for the instrumented run, and
 `test_every_covering_test_is_recorded_not_just_the_first` fails if that is
 removed.
 
+## Run G — external repos, third-party review baseline, 2026-08-14
+
+Runs A–F all measure mutagen against code the author wrote or owns. This run
+checks the other direction: does the score move in the expected direction on
+code that has years of independent review behind it, from projects the author
+does not own and did not touch?
+
+Two candidates, picked from GitHub by stars/domain/license fit, cloned
+read-only, installed into a fresh venv each, `pytest` run unmodified before
+touching mutagen:
+
+| Repo | Stars | License | Scope | Pre-existing suite |
+| --- | --- | --- | --- | --- |
+| [r1chardj0n3s/parse](https://github.com/r1chardj0n3s/parse) — reverse of `str.format()` | 1.8k | MIT | `parse/__init__.py` (46 functions) | 99 passed, 1 skipped |
+| [python-parsy/parsy](https://github.com/python-parsy/parsy) — parser combinators | 451 | MIT | `src/parsy/__init__.py` (64 functions) | 86 passed, 2 skipped |
+
+```bash
+mutagen run --all --path parse/__init__.py --report-md report.md --report-json report.json
+mutagen run --all --path src/parsy/__init__.py --report-md report.md --report-json report.json
+```
+
+| | parse | parsy |
+| --- | ---: | ---: |
+| Mutants generated | 25 | 25 |
+| killed | 17 | 18 |
+| survived | 8 | 6 |
+| — of which unreached | 1 | 0 |
+| timeout | 0 | 1 |
+| **Mutation score** | **68%** (17/25) | **75%** (18/24) |
+| LLM calls | 11 | 10 |
+| Cost | $0.1325 | $0.1288 |
+| Duration | 69.1 s | 94.5 s |
+| Mapping | coverage | coverage |
+
+Both scores land far above the 4–24% range Runs A–F see on the author's own
+projects. That is the expected result, not a surprise to explain away:
+mutation score should track the quality and age of the test suite, and both
+of these libraries have had years of independent contributors and code review
+behind their tests. A method that produced ~20% on everything regardless of
+the target would not be measuring anything.
+
+### Survivors, verified by hand
+
+Every survivor below was reviewed manually against the diff and the
+project's own test suite before being counted as real. `report.json` in
+[`benchmarks/data/parse_report.json`](benchmarks/data/parse_report.json) and
+[`benchmarks/data/parsy_report.json`](benchmarks/data/parsy_report.json) has
+the full machine output; `parse_run.log` / `parsy_run.log` in the same
+directory are the unedited CLI transcripts.
+
+**parse — 7 real, 1 unreached:**
+
+| # | Function | Kind | Verdict |
+| --- | --- | --- | --- |
+| 1 | `int_convert.__call__` | off_by_one | real — signed `0x`/`0o`/`0b` literals mis-detect their base |
+| 2 | `convert_first.__call__` | empty_input | real — empty string now short-circuits to `None` before the user's converter runs |
+| 3 | `FixedTzOffset.__init__` (offset) | wrong_operator | real — offset only applied when non-zero, degenerate case wrong |
+| 4 | `FixedTzOffset.__init__` (sign) | wrong_operator | real — offset sign flipped, east/west swapped |
+| 5 | `FixedTzOffset.__init__` (name) | other | real — name silently uppercased |
+| 6 | `FixedTzOffset.utcoffset` (+1min) | wrong_operator | real — UTC offset shifted by a constant minute |
+| 7 | `FixedTzOffset.utcoffset` (→None) | missing_return | real — offset always reported as `None` |
+| 8 | `FixedTzOffset.tzname` | wrong_default | **unreached** — no test in the suite calls `tzname()` at all; not a weak assertion, an absence |
+
+6 of the 7 real survivors sit in one class, `FixedTzOffset` — the suite
+exercises `parse()`'s datetime formats but never asserts on the tzinfo object
+those formats construct. The 7th is unrelated: an off-by-one in the numeric
+base-prefix detector for signed integers.
+
+**parsy — 6 real, 1 timeout:**
+
+| # | Function | Kind | Verdict |
+| --- | --- | --- | --- |
+| 1 | `ParseError.line_info` | swallowed_error | real — narrow `except (TypeError, AttributeError)` widened to bare `Exception` |
+| 2 | `ParseError.__str__` | boundary_condition | real — `== 1` weakened to `<= 1`, breaks the zero-expected case |
+| 3 | `Result.success` | wrong_default | real — furthest-failure index leaks the success index instead of `-1` |
+| 4 | `Result.failure` | wrong_default | real — `None` expected value still gets wrapped into the set |
+| 5 | `Result.aggregate` | none_handling | real — `not other` narrowed to `other is None`, drops falsy-but-present results |
+| 6 | `Parser.__init__` | wrong_default | real — falsy `wrapped_fn` silently replaced by a shared `string("")` parser |
+| — | (unnamed) | — | 1 mutant timed out; no verdict, excluded from the score denominator like every other run |
+
+All 6 real survivors are in the same place: the error-reporting meta-layer
+(`ParseError`, `Result`). parsy's own tests assert on successful parses and
+on the *shape* of failures, but not on the internal bookkeeping
+(`furthest`, `expected`) that only matters once results get merged across
+alternatives — exactly the kind of thing a hand-written test suite tends to
+under-specify because it never causes a wrong *answer* on its own, only a
+worse error message or a rare double-counting bug.
+
+### Caveats
+
+- One module per repo, `--max-mutants 25` (the default) — this is a spot
+  check, not a full-repo score. A `--all` run over the whole package would
+  likely move both numbers.
+- Neither repo's source was touched; nothing was forked, no issue or PR was
+  filed. The clones live outside this repository and are not part of it.
+  This run is read-only research, not a claim about either project's quality.
+- Survivor verdicts above are the author's manual read of each diff against
+  the target repo's actual test suite, not an automated check — the same
+  standard applied to every other run in this file.
+
 ## Determinism
 
 - LLM responses are cached on disk under `.mutagen/cache/`, keyed on
