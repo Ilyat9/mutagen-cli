@@ -67,9 +67,9 @@ generates different mutants.
 
 ```bash
 python scripts/dump_prompts.py --out prompts/
-# a Claude Sonnet agent answered all 15 prompts into live_replies.json
-python scripts/benchmark.py --replies live_replies.json --max-mutants 50 \
-    --save-report live_report.json
+# a Claude Sonnet agent answered all 15 prompts into benchmarks/data/live_replies.json
+python scripts/benchmark.py --replies benchmarks/data/live_replies.json --max-mutants 50 \
+    --save-report benchmarks/data/live_report.json
 ```
 
 Measured 2026-08-13. The 15 real per-function prompts were dumped verbatim and
@@ -182,7 +182,7 @@ python scripts/benchmark.py --live --invent --save-report live_api_report.json
 ```
 
 **Not measured.** No Anthropic credentials are available in this environment.
-Attempted once on 2026-08-13; the log is in `benchmark_live.log`:
+Attempted once on 2026-08-13; the log is in `benchmarks/data/benchmark_live.log`:
 
 ```
 warning: victim/cache.py::LRUCache.__init__: no API key found. Set ANTHROPIC_API_KEY,
@@ -214,16 +214,16 @@ every survivor.
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 python scripts/benchmark.py --live --invent --provider openrouter \
-    --model anthropic/claude-sonnet-5 --save-report live_sonnet5.json
+    --model anthropic/claude-sonnet-5 --save-report benchmarks/data/live_sonnet5.json
 python scripts/benchmark.py --live --invent --provider openrouter \
-    --model anthropic/claude-opus-5 --save-report live_opus5.json
+    --model anthropic/claude-opus-5 --save-report benchmarks/data/live_opus5.json
 ```
 
 Measured **2026-08-13** with a real OpenRouter key, `--invent` on, cold cache.
 Both models ran with `reasoning: {"enabled": false}` (the OpenRouter default
 is *on* for them — see DECISIONS.md D8) and no sampling parameters. Reports:
-`live_sonnet5.json` / `live_opus5.json`, full logs in `live_sonnet5.log` /
-`live_opus5.log`.
+`benchmarks/data/live_sonnet5.json` / `benchmarks/data/live_opus5.json`, full
+logs in `benchmarks/data/live_sonnet5.log` / `benchmarks/data/live_opus5.log`.
 
 | Metric | anthropic/claude-sonnet-5 | anthropic/claude-opus-5 |
 | --- | --- | --- |
@@ -280,7 +280,7 @@ without `.venv`/`.mutagen`/caches, new virtualenv, `pip install -e ".[dev]"`).
 | Project test suite | **74 passed** (was 61 before the audit's regression tests) |
 | `ruff check .` | clean |
 | Run A reproduced | **28 mutants, 12/16, 42.9%, 28/28 golden verdicts** — identical |
-| Run B reproduced (`--replies live_replies.json`) | **43 mutants, 8/35, 18.6%, 0% unapplicable** — identical |
+| Run B reproduced (`--replies benchmarks/data/live_replies.json`) | **43 mutants, 8/35, 18.6%, 0% unapplicable** — identical |
 | `mutagen run --all --dry-run` on mutagen itself | 94 functions in 13 files, plan printed, 9 calls quoted, nothing spent |
 | Live mini-run, OpenRouter, `--max-mutants 5` | 5 mutants, 0% unapplicable, 2 calls, **$0.014**, 14.7 s |
 | 3 hand-written must-die mutants through the CLI | all 3 `killed`, each naming its own failing test |
@@ -309,7 +309,7 @@ mutant is then run against the tests that execute the lines it changed.
 
 ```bash
 python scripts/benchmark.py                                  # Run A, remapped
-python scripts/benchmark.py --replies live_replies.json --max-mutants 50
+python scripts/benchmark.py --replies benchmarks/data/live_replies.json --max-mutants 50
 ```
 
 | | Run A (heuristic) | Run A (coverage) | Run B (heuristic) | Run B (coverage) |

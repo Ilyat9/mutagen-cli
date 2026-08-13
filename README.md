@@ -70,7 +70,7 @@ happy path систематически не видят.
 `mutagen`.
 
 ```bash
-git clone https://github.com/mutagen-cli/mutagen && cd mutagen && pip install -e .
+git clone https://github.com/Ilyat9/mutagen-cli && cd mutagen-cli && pip install -e .
 ```
 
 ```bash
@@ -174,11 +174,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .[dev]
-      - uses: mutagen-cli/mutagen@v0
+      - uses: Ilyat9/mutagen-cli@v0
         with:
-          provider: anthropic          # или openrouter
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          provider: openrouter         # или anthropic
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           fail-under: "70"
           invent: "true"
 ```

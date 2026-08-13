@@ -40,7 +40,7 @@ Not on PyPI yet — install from source (`mutagen-cli` is the reserved
 distribution name; the command is `mutagen`).
 
 ```bash
-git clone https://github.com/mutagen-cli/mutagen && cd mutagen && pip install -e .
+git clone https://github.com/Ilyat9/mutagen-cli && cd mutagen-cli && pip install -e .
 export OPENROUTER_API_KEY=sk-or-...
 mutagen run
 ```

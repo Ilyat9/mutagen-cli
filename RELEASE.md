@@ -3,12 +3,14 @@
 ## Before the first release
 
 Push to GitHub first — the README's install line, `action.yml` and the
-`Homepage` in `pyproject.toml` all point at `github.com/mutagen-cli/mutagen`.
+`Homepage` in `pyproject.toml` all point at `github.com/Ilyat9/mutagen-cli`.
 
 ```bash
-git remote add origin git@github.com:mutagen-cli/mutagen.git
+git remote add origin git@github.com:Ilyat9/mutagen-cli.git
 git push -u origin main
 ```
+
+Done — the repo is live at that address.
 
 Then claim the name on PyPI. `mutagen-cli` was free as of 2026-08-13 (`mutagen`
 itself is the audio-metadata library and is not ours). Register at

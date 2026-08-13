@@ -32,8 +32,8 @@ dependencies = [
 dev = ["pytest>=7.0", "pytest-cov>=5.0", "ruff>=0.6"]
 
 [project.urls]
-Homepage = "https://github.com/mutagen-cli/mutagen"
-Issues = "https://github.com/mutagen-cli/mutagen/issues"
+Homepage = "https://github.com/Ilyat9/mutagen-cli"
+Issues = "https://github.com/Ilyat9/mutagen-cli/issues"
 
 [project.scripts]
 mutagen = "mutagen_cli.cli:main"

@@ -8,7 +8,7 @@ inputs:
   provider:
     description: LLM provider. "openrouter" (works from Russia without a VPN) or "anthropic".
     required: false
-    default: anthropic
+    default: openrouter
   anthropic-api-key:
     description: Anthropic API key. Store it as a repository secret. Required when provider is "anthropic".
     required: false
@@ -63,7 +63,7 @@ runs:
       shell: bash
       # Installed from the action's own checkout rather than PyPI: the package
       # is not published yet, and this pins mutagen to the same ref the workflow
-      # already picked with `uses: mutagen-cli/mutagen@<ref>`. Switch to
+      # already picked with `uses: Ilyat9/mutagen-cli@<ref>`. Switch to
       # `pip install mutagen-cli` once the package is on PyPI.
       run: pip install --quiet "${{ github.action_path }}"
 

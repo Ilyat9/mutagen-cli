@@ -20,8 +20,14 @@ mutagen-report.json
 reports/
 mutagen-cache/
 
-# Regenerable benchmark artefacts. `live_replies.json`, `live_sonnet5.*`,
-# `live_opus5.*` and `benchmark_live.log` are deliberately NOT ignored — they
-# are the evidence behind BENCHMARKS.md Runs B, C and D.
+# Regenerable benchmark artefacts, kept under benchmarks/data/. `live_replies.json`,
+# `live_sonnet5.*`, `live_opus5.*` and `benchmark_live.log` there are deliberately
+# NOT ignored — they are the evidence behind BENCHMARKS.md Runs B, C and D.
 prompts/
-live_report.json
+benchmarks/data/live_report.json
+
+# A stray `live_*.json`/`.log` re-created at the repo root (e.g. by rerunning
+# scripts/benchmark.py without --save-report pointed at benchmarks/data/) is
+# clutter, not evidence — keep it out of git.
+/live_*.json
+/live_*.log
