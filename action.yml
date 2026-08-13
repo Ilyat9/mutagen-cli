@@ -1,4 +1,4 @@
-name: mutagen
+name: mutagen-cli
 description: Mutation-test the code changed in a pull request and comment the survivors.
 branding:
   icon: alert-triangle
