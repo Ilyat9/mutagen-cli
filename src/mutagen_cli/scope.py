@@ -41,7 +41,12 @@ def repo_root(start: Path) -> Path:
         out = run_git(["rev-parse", "--show-toplevel"], start)
     except ScopeError as exc:
         raise ScopeError(f"{start} is not inside a git repository") from exc
-    return Path(out.strip())
+    # Resolved so --path's is_relative_to(root) check below still holds when
+    # the repo was opened through a symlinked path: git prints the toplevel
+    # in whatever form `start` was given, but abs_path.resolve() always
+    # follows symlinks, and comparing an unresolved root against a resolved
+    # path would falsely report files as outside the repository.
+    return Path(out.strip()).resolve()
 
 
 def is_skipped(rel: str) -> bool:

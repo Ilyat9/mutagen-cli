@@ -1,4 +1,7 @@
 import subprocess
+import sys
+
+import pytest
 
 from mutagen_cli.scope import (
     changed_line_ranges,
@@ -49,6 +52,22 @@ def test_syntax_error_file_yields_nothing(tmp_path):
 
 def test_repo_root_is_found(victim_repo):
     assert repo_root(victim_repo) == victim_repo
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need admin on Windows")
+def test_repo_root_resolves_a_symlinked_path(victim_repo, tmp_path):
+    # `git rev-parse --show-toplevel` echoes back whatever path form it was
+    # invoked from. If a symlink into the repo is used, an unresolved root
+    # makes `--path`'s is_relative_to(root) check falsely report files
+    # inside the repo as outside it.
+    link = tmp_path / "victim_link"
+    link.symlink_to(victim_repo)
+    assert repo_root(link) == victim_repo.resolve()
+
+    targets = collect_targets(
+        repo_root(link), paths=[str(link / "victim" / "cache.py")]
+    )
+    assert targets
 
 
 def test_uncommitted_edits_are_in_scope(victim_repo):
