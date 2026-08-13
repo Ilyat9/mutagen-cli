@@ -1,88 +1,49 @@
+Другая версия: [English](README.en.md)
+
 # mutagen
 
-**Your tests are green. Here's what they don't catch.**
+**Ваши тесты зелёные. Вот что они не проверяют.**
 
-mutagen introduces realistic bugs into your code — off-by-one errors, missed
-cache invalidation, swapped arguments, inverted conditions — and reruns your
-test suite. Any bug that survives is a gap in your tests, reported as the
-concrete failure your users will hit.
+mutagen подсаживает в код правдоподобные баги — off-by-one, забытую
+инвалидацию кэша, перепутанные аргументы, инвертированные условия — и
+перезапускает ваш тестовый сьют. Любой баг, который выжил, — дыра в тестах;
+она репортится как конкретный сценарий отказа, с которым столкнётся
+пользователь.
 
-Unlike classic mutation testing, the mutants are written by an LLM that has
-read both your function *and* the tests covering it, so it aims at the blind
-spots instead of flipping operators at random.
+В отличие от классического mutation testing, мутанты пишет LLM, которая
+прочитала и саму функцию, и покрывающие её тесты — она целится в слепые пятна,
+а не переставляет операторы наугад.
 
-Built for the case where you (or Claude Code, or Cursor) just wrote a pile of
-code and a pile of tests, and you want to know whether the tests mean anything.
+Сделано для ситуации, когда вы (или Claude Code, или Cursor) только что
+написали кучу кода и кучу тестов к нему, и хочется понять, значат ли эти тесты
+хоть что-нибудь.
 
-Real output, from the sample project in `tests/fixtures/victim_project` — 36
-tests, all green, half of them deliberately worthless:
+Реальный отчёт — выдержка из прогона на стороннем репозитории
+([CogniWeb_Agent](https://github.com/Ilyat9/CogniWeb_Agent), 19 тестов на
+моках, все зелёные):
 
-```
-mapping: coverage (15/15 function(s) mapped from a 0.5s instrumented baseline; 1 reached by no test)
+<img src="assets/mutagen_report.svg" alt="mutagen run: mutation score 12%, два выживших мутанта — off-by-one в обрезке истории и инвертированная проверка капчи" width="900">
 
-╭───────────────────────────────────────────────────────╮
-│ mutation score  43%   (12 killed / 28 viable mutants) │
-╰───────────────────────────────────────────────────────╯
+Воспроизвести на встроенном фикстур-проекте: `python scripts/benchmark.py`
+(офлайн, детерминированно, ноль обращений к сети — сеть трогается только с
+явным `--live`).
 
-file                  killed  survived  score
-victim/cache.py            3         5    38%
-victim/pagination.py       4         3    57%
-victim/parsing.py          2         3    40%
-victim/pricing.py          1         3    25%
-victim/text.py             2         2    50%
+На том же проекте с **мутантами, написанными моделью**: 43 мутанта на 15
+функциях, 8 killed, 35 survived, **0 неприменимых**, из 35 выживших мусорных
+только 2 (5.7%). Они накрыли 18 из 22 задокументированных слепых пятен теста
+проекта — и ещё 7, которые не были описаны в его собственных заметках. Полные
+цифры и оговорки — [BENCHMARKS.md](BENCHMARKS.md).
 
-15 bugs your tests would not catch
+Живой прогон через OpenRouter API (2026-08-13, `--invent` включён):
+`anthropic/claude-sonnet-5` — 40 мутантов, **0% неприменимых**, 12.9% мусорных
+выживших, **$0.26**; `anthropic/claude-opus-5` — 0% неприменимых, 3.0%
+мусорных, 14/22 слепых пятен, **$0.68**. Подробности —
+[BENCHMARKS.md](BENCHMARKS.md), прогон D.
 
-╭──────────────────────────── survivor 11 ─────────────────────────────╮
-│ the discount cap acts as a floor, so capped promotions give away     │
-│ more than intended                                                   │
-│ victim/pricing.py::apply_discount   [wrong_operator]                 │
-╰──────────────────────────────────────────────────────────────────────╯
---- victim/pricing.py
-+++ victim/pricing.py (mutated)
-@@ -19,4 +19,4 @@
-     if max_discount is not None:
--        discount = min(discount, max_discount)
-+        discount = max(discount, max_discount)
+## Быстрый старт
 
-1 mutant(s) in code no test executes at all
-Not a weak assertion — an absence. No test reaches these lines, so nothing here
-could ever have failed.
-
-╭─────────────────────────────── unreached 1 ────────────────────────────────╮
-│ the first page reports a previous page, so back buttons render on page one │
-│ victim/pagination.py::Page.has_prev   [boundary_condition]                 │
-╰────────────────────────────────────────────────────────────────────────────╯
---- victim/pagination.py
-+++ victim/pagination.py (mutated)
-@@ -18,5 +18,5 @@
-     @property
-     def has_prev(self):
--        return self.page > 1
-+        return self.page >= 1
-
-12 killed  16 survived (1 of them unreached by any test)
-```
-
-Reproduce it yourself: `python scripts/benchmark.py` (offline, deterministic,
-zero API calls — it never touches the network without an explicit `--live`).
-
-Pointed at the same project with **model-written** mutants, it produced 43
-mutants across 15 functions: 8 killed, 35 survived, **0 unapplicable**, and of
-the 35 survivors only 2 were junk (5.7%). They covered 18 of the 22 test blind
-spots documented for that project — plus 7 the project's own notes had missed.
-Full numbers and caveats in [BENCHMARKS.md](BENCHMARKS.md).
-
-Live over the OpenRouter API (2026-08-13, `--invent` on):
-`anthropic/claude-sonnet-5` produced 40 mutants with **0% unapplicable** and
-12.9% junk survivors for **$0.26**; `anthropic/claude-opus-5` — 0%
-unapplicable, 3.0% junk, 14/22 blind spots, **$0.68**. Details in
-[BENCHMARKS.md](BENCHMARKS.md) Run D.
-
-## Quickstart
-
-Not on PyPI yet — install from source. The distribution name is reserved as
-`mutagen-cli` (`mutagen` itself is the audio-metadata library); the command is
+Пока не в PyPI — ставится из исходников. Имя дистрибутива зарезервировано как
+`mutagen-cli` (`mutagen` — это библиотека для аудио-метаданных), команда —
 `mutagen`.
 
 ```bash
@@ -97,68 +58,70 @@ export OPENROUTER_API_KEY=sk-or-...
 mutagen run
 ```
 
-That's it. No config file. `mutagen run` diffs your working tree against `main`,
-mutates only the functions you changed, and runs only the tests that actually
-cover them. See [Providers](#providers) if you'd rather talk to Anthropic directly.
+Готово. Никакого конфига. `mutagen run` сравнивает рабочее дерево с `main`,
+мутирует только изменённые функции и гоняет только те тесты, которые их
+реально покрывают. Если хотите говорить напрямую с Anthropic — см.
+[Провайдеры](#провайдеры).
 
-## Providers
+## Провайдеры
 
-mutagen supports two LLM providers, switched with `--provider`:
+mutagen поддерживает два LLM-провайдера, переключается флагом `--provider`:
 
-**OpenRouter (default).** An OpenAI-compatible gateway that carries the same
-Claude models — useful because the Anthropic API does not serve every region.
-OpenRouter works from Russia without a VPN.
+**OpenRouter (по умолчанию).** OpenAI-совместимый шлюз, отдающий те же модели
+Claude — полезно, потому что API Anthropic обслуживает не все регионы.
+OpenRouter работает из России без VPN.
 
-1. Create a key at <https://openrouter.ai/keys>.
-2. `export OPENROUTER_API_KEY=sk-or-...`, or put
-   `{"openrouter_api_key": "sk-or-..."}` in `.mutagen/config.json`.
+1. Создайте ключ на <https://openrouter.ai/keys>.
+2. `export OPENROUTER_API_KEY=sk-or-...`, либо положите
+   `{"openrouter_api_key": "sk-or-..."}` в `.mutagen/config.json`.
 
-Default model: `anthropic/claude-sonnet-5` — the best price/quality point for
-mutant generation ($2/M input, $10/M output as of 2026-08-13). Override with
-`--model`, e.g. `--model anthropic/claude-opus-5`.
+Модель по умолчанию: `anthropic/claude-sonnet-5` — лучшая точка цена/качество
+для генерации мутантов ($2/M input, $10/M output на 2026-08-13).
+Переопределяется `--model`, например `--model anthropic/claude-opus-5`.
 
-**Anthropic.** Direct API access.
+**Anthropic.** Прямой доступ к API.
 
-1. `export ANTHROPIC_API_KEY=sk-ant-...`, or put
-   `{"anthropic_api_key": "sk-ant-..."}` in `.mutagen/config.json`.
-2. Run with `--provider anthropic`. Default model: `claude-opus-5`.
+1. `export ANTHROPIC_API_KEY=sk-ant-...`, либо положите
+   `{"anthropic_api_key": "sk-ant-..."}` в `.mutagen/config.json`.
+2. Запуск с `--provider anthropic`. Модель по умолчанию: `claude-opus-5`.
 
-Two provider-specific behaviours worth knowing:
+Два нюанса, специфичных для провайдера:
 
-- The Claude 5 models on OpenRouter run with **reasoning enabled by default**,
-  which pollutes the JSON reply and inflates cost. mutagen explicitly sends
-  `reasoning: {"enabled": false}` on every request. To opt back in, set
-  `{"openrouter_reasoning": true}` in the config file.
-- Sampling parameters (`temperature` and friends) are silently ignored by those
-  models, so the OpenRouter provider never sends them.
+- Модели Claude 5 на OpenRouter по умолчанию гоняются с **включённым
+  reasoning**, который засоряет JSON-ответ и раздувает стоимость. mutagen
+  явно шлёт `reasoning: {"enabled": false}` на каждый запрос. Чтобы включить
+  обратно — `{"openrouter_reasoning": true}` в конфиге.
+- Параметры сэмплинга (`temperature` и другие) эти модели молча игнорируют,
+  поэтому провайдер OpenRouter их вообще не отправляет.
 
-Cost is computed from the API's usage fields against a built-in price table.
-Override it or price an unlisted model via `{"prices": {"model/id":
-[input_per_mtok, output_per_mtok]}}` in the config; a model with no known price
-is reported as "cost unavailable" rather than $0.
+Стоимость считается из полей usage в ответе API по встроенной таблице цен.
+Её можно переопределить или добавить цену для неизвестной модели через
+`{"prices": {"model/id": [input_per_mtok, output_per_mtok]}}` в конфиге; для
+модели без известной цены отчёт покажет «cost unavailable», а не $0.
 
-## Usage
-
-```bash
-mutagen run                          # only what changed vs main
-mutagen run --base develop           # ...vs another branch
-mutagen run --path src/billing.py    # specific files or directories
-mutagen run --all                    # the whole codebase
-mutagen run --dry-run                # show the plan and the test mapping, spend nothing
-```
-
-Turning survivors into tests:
+## Использование
 
 ```bash
-mutagen run --invent          # print a test that would catch each survivor
-mutagen run --invent-apply    # ...and save the verified ones to tests/mutagen_generated/
+mutagen run                          # только то, что изменилось относительно main
+mutagen run --base develop           # ...относительно другой ветки
+mutagen run --path src/billing.py    # конкретные файлы или директории
+mutagen run --all                    # весь кодбейз
+mutagen run --dry-run                # показать план и мэппинг тестов, не тратя денег
 ```
 
-Every suggested test is checked twice before you see it: it must pass against
-your real code and fail against the mutant. Suggestions that fail either check
-are still shown, but labelled — the feature does not get to lie to you.
+Превращаем выживших в тесты:
 
-For CI:
+```bash
+mutagen run --invent          # напечатать тест, который поймал бы каждого выжившего
+mutagen run --invent-apply    # ...и сохранить проверенные в tests/mutagen_generated/
+```
+
+Каждый предложенный тест проверяется дважды, прежде чем вы его увидите: он
+обязан проходить на реальном коде и падать на мутанте. Тесты, не прошедшие
+хотя бы одну проверку, всё равно показываются, но с пометкой — фича не имеет
+права вам врать.
+
+Для CI:
 
 ```bash
 mutagen run --report-md report.md --report-json report.json --fail-under 70
@@ -166,9 +129,9 @@ mutagen run --report-md report.md --report-json report.json --fail-under 70
 
 ### GitHub Action
 
-`action.yml` in this repo is a mutation gate for pull requests. It mutates only
-what the PR changed and posts the survivors as a comment, editing the same
-comment on each push instead of piling up new ones.
+`action.yml` в этом репозитории — мутационный гейт для pull request'ов. Он
+мутирует только то, что изменил PR, и постит выживших комментарием, редактируя
+один и тот же комментарий на каждый push вместо того, чтобы плодить новые.
 
 ```yaml
 name: mutation
@@ -190,116 +153,130 @@ jobs:
       - run: pip install -e .[dev]
       - uses: mutagen-cli/mutagen@v0
         with:
-          provider: anthropic          # or openrouter
+          provider: anthropic          # или openrouter
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           # openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
           fail-under: "70"
           invent: "true"
 ```
 
-### Options that matter
+### Важные флаги
 
-| Flag | Default | |
+| Флаг | По умолчанию | |
 | --- | --- | --- |
-| `--max-mutants N` | 25 | Hard ceiling on how many mutants to generate. |
-| `--max-files N` | 20 | Hard ceiling on files considered. |
-| `--timeout SECS` | 30 | Per-mutant budget. Raised automatically if your suite is slow. |
-| `--workers N` | CPUs/2 | Mutants run in parallel, each in its own copy of the repo. |
-| `--provider NAME` | `openrouter` | `openrouter` or `anthropic`. See [Providers](#providers). |
-| `--model ID` | provider's default | `anthropic/claude-sonnet-5` on OpenRouter, `claude-opus-5` on Anthropic. |
-| `--effort LEVEL` | `medium` | `low`…`max`. Lower is cheaper and faster. Anthropic only. |
-| `--no-cache` | off | Ignore the on-disk cache in `.mutagen/cache/`. |
-| `--python PATH` | project venv | Interpreter used to run your tests. |
+| `--max-mutants N` | 25 | Жёсткий потолок числа генерируемых мутантов. |
+| `--max-files N` | 20 | Жёсткий потолок числа рассматриваемых файлов. |
+| `--timeout SECS` | 30 | Бюджет времени на мутанта. Автоматически увеличивается, если сьют медленный. |
+| `--workers N` | CPUs/2 | Мутанты гоняются параллельно, каждый — в своей копии репо. |
+| `--provider NAME` | `openrouter` | `openrouter` или `anthropic`. См. [Провайдеры](#провайдеры). |
+| `--model ID` | дефолт провайдера | `anthropic/claude-sonnet-5` на OpenRouter, `claude-opus-5` на Anthropic. |
+| `--effort LEVEL` | `medium` | `low`…`max`. Ниже — дешевле и быстрее. Только для Anthropic. |
+| `--no-cache` | выкл | Игнорировать дисковый кэш в `.mutagen/cache/`. |
+| `--python PATH` | venv проекта | Интерпретатор, которым гоняются тесты. |
 
-LLM responses are cached on disk per function, so re-running after editing one
-function only pays for that function. The cache key includes the tests shown to
-the model, so a change in coverage correctly misses the cache.
+Ответы LLM кэшируются на диске отдельно на каждую функцию, так что повторный
+запуск после правки одной функции платит только за неё. Ключ кэша включает
+набор тестов, показанных модели, — так что изменение покрытия корректно
+промахивается мимо кэша.
 
-## What the verdicts mean
+**Особенность, о которую легко споткнуться:** `--max-mutants` — общий лимит
+на весь запуск, а не на файл. `mutagen run --all --path a.py --path b.py
+--max-mutants 25` сгенерирует до 25 мутантов суммарно на оба файла — если
+функций в `a.py` достаточно, чтобы съесть весь лимит, `b.py` может не
+получить ни одного. Для гарантированного покрытия каждого файла — отдельные
+прогоны с `--path` по одному файлу за раз.
 
-| Verdict | Meaning |
+## Что значат вердикты
+
+| Вердикт | Значение |
 | --- | --- |
-| **killed** | A test failed. Good — the bug would have been caught. |
-| **survived** | Every test still passed. This is a hole in your suite. |
-| **timeout** | The mutant probably created an infinite loop. Counted separately, not as a kill. |
-| **survived (unreached)** | A survivor of a stronger kind: no test executes the mutated lines at all, so nothing could ever have failed. Needs a coverage map; scored as a survivor. |
-| **unapplicable** | The edit couldn't be placed in the file, or didn't parse. Excluded from the score entirely. |
-| **error** | pytest could not run (collection error, no tests). Excluded from the score. |
+| **killed** | Тест упал. Хорошо — баг был бы пойман. |
+| **survived** | Все тесты прошли. Это дыра в сьюте. |
+| **timeout** | Мутант, вероятно, создал бесконечный цикл. Считается отдельно, не как kill. |
+| **survived (unreached)** | Выживший более сильного типа: ни один тест вообще не исполняет мутированные строки, так что упасть не могло ничего. Требует карты покрытия; засчитывается как survived. |
+| **unapplicable** | Правку не удалось применить к файлу, либо получившийся код не парсится. Полностью исключается из score. |
+| **error** | pytest не смог запуститься (ошибка сбора, нет тестов). Исключается из score. |
 
-Mutation score is `killed / (killed + survived)`. Timeouts, errors, and
-unapplicable mutants are deliberately kept out of the numerator and the
-denominator — counting them as kills would flatter the score for no reason.
+Mutation score — это `killed / (killed + survived)`. Timeout, error и
+unapplicable намеренно не входят ни в числитель, ни в знаменатель: засчитывать
+их как kill означало бы искусственно завышать score.
 
-## Requirements
+## Требования
 
 - Python 3.10+
-- `pytest-cov` in the interpreter that runs your tests, for coverage-based test
-  mapping. Optional — without it mutagen falls back to a heuristic and says so.
-- A pytest suite that currently passes. mutagen checks this first and refuses to
-  run against a red suite, because every mutant would look "killed".
-- An OpenRouter API key in `OPENROUTER_API_KEY` (get one at
-  <https://openrouter.ai/keys> — works from Russia without a VPN), or an
-  Anthropic key in `ANTHROPIC_API_KEY` with `--provider anthropic`. Keys can
-  also live in `.mutagen/config.json`.
+- `pytest-cov` в интерпретаторе, которым гоняются тесты — для мэппинга тестов
+  по покрытию. Опционально: без него mutagen откатывается на эвристику и
+  прямо говорит об этом в отчёте.
+- Проходящий на момент запуска pytest-сьют. mutagen проверяет это первым делом
+  и отказывается работать на красном сьюте, потому что на нём любой мутант
+  выглядел бы «убитым».
+- Ключ OpenRouter в `OPENROUTER_API_KEY` (получить —
+  <https://openrouter.ai/keys>, работает из России без VPN), либо ключ
+  Anthropic в `ANTHROPIC_API_KEY` с `--provider anthropic`. Ключи можно также
+  держать в `.mutagen/config.json`.
 
-macOS and Linux are tested. Windows is not.
+macOS и Linux протестированы. Windows — нет.
 
-### Working on mutagen itself
+### Разработка самого mutagen
 
 ```bash
 pip install -e ".[dev]" && pytest && ruff check .
 ```
 
-74 tests, all offline and free: the pipeline tests drive real pytest
-subprocesses through a replay provider, and the CLI tests pre-seed the disk
-cache so no API key is involved.
+74 теста, все офлайн и бесплатные: тесты пайплайна гоняют настоящие
+подпроцессы pytest через replay-провайдер, а тесты CLI заранее засеивают
+дисковый кэш, так что API-ключ вообще не нужен.
 
-## Limitations
+## Ограничения
 
-- **Python and pytest only.** No other languages or runners.
-- **Cost is real.** One LLM call per changed function, plus one per survivor
-  with `--invent`. The disk cache means iteration is cheap, but the first run
-  on a large diff is not free. Use `--dry-run` to see the call count first.
-- **Equivalent mutants still slip through.** The prompt works hard to forbid
-  mutations that don't change behaviour, and most of what remains is real, but
-  not all of it. A "survivor" is a lead to investigate, not a proven gap.
-- **Precise test mapping needs `pytest-cov`** in the interpreter that runs your
-  tests. With it, mutagen measures which tests execute which lines. Without it
-  it falls back to a filename/symbol heuristic and says so in the report — and
-  a heuristic that picks the wrong files reports mutants as survivors when the
-  test that would kill them simply never ran.
-- **Each worker copies your repo** into a temp directory. Large repos with
-  large untracked directories will feel that.
-- **Your working tree is never touched** — except by `--invent-apply`, which
-  writes new files under `tests/mutagen_generated/` and nowhere else.
-- **Not a coverage tool.** A high mutation score on the functions you changed
-  says nothing about the functions you didn't.
+- **Только Python и pytest.** Другие языки и раннеры не поддерживаются.
+- **Стоимость реальна.** Один вызов LLM на изменённую функцию, плюс ещё один
+  на каждого выжившего при `--invent`. Дисковый кэш делает повторные прогоны
+  дешёвыми, но первый прогон на большом диффе бесплатным не будет.
+  `--dry-run` покажет число вызовов заранее.
+- **Эквивалентные мутанты всё равно проскакивают.** Промпт активно запрещает
+  мутации, не меняющие поведение, и большинство выживших — реальные баги, но
+  не все. «Survivor» — это наводка для проверки, а не доказанная дыра.
+- **Точный мэппинг тестов требует `pytest-cov`** в интерпретаторе, которым
+  гоняются тесты. С ним mutagen измеряет, какие тесты исполняют какие строки.
+  Без него — откат на эвристику по имени файла/символу, и отчёт прямо об этом
+  говорит; эвристика, угадавшая не те файлы, репортит мутантов как выживших,
+  хотя тест, который бы их убил, просто не запускался.
+- **Каждый воркер копирует репозиторий** во временную директорию. Большие
+  репо с большими неотслеживаемыми директориями это почувствуют.
+- **Рабочее дерево не трогается никогда** — кроме `--invent-apply`, который
+  пишет новые файлы в `tests/mutagen_generated/` и больше никуда.
+- **Это не инструмент покрытия.** Высокий mutation score на изменённых вами
+  функциях ничего не говорит о функциях, которые вы не трогали.
 
-## How it works
+## Как это работает
 
-1. `git diff` against the merge base → changed line ranges (committed *and*
-   uncommitted, plus untracked files).
-2. `ast` maps those lines to whole functions, so the model sees complete units.
-3. Your suite runs once, unmutated, under `coverage` with a per-test context.
-   That single run does two jobs: it proves the suite is green before any money
-   is spent, and it produces the map of **which tests execute which lines**.
-   Without `pytest-cov` installed, mutagen falls back to a filename/symbol
-   heuristic and labels the report `mapping: heuristic`.
-4. Each function is sent to the model together with the tests that actually
-   cover it, with instructions to produce bugs those tests look least likely to
-   catch. Responses are constrained to a JSON schema.
-5. Mutations come back as SEARCH/REPLACE blocks (not diffs — models get line
-   numbers wrong). They are applied exactly where possible, then with
-   whitespace and indentation normalisation, then fuzzily via `difflib` — and
-   always **inside the target function's own line range**, so a block that also
-   occurs in a neighbouring function cannot silently mutate that one instead.
-   Blocks that can't be placed there, or that produce code which doesn't parse,
-   are marked unapplicable rather than guessed at.
-6. Each mutant runs in a worker's private copy of the repo, against exactly
-   the tests that execute the lines it changed, with a timeout. A mutation on
-   lines **no** test executes is not run at all — nothing could depend on it —
-   and is reported as `unreached` in its own section.
+1. `git diff` относительно merge base → изменённые диапазоны строк
+   (закоммиченное и незакоммиченное, плюс untracked-файлы).
+2. `ast` сопоставляет эти строки с целыми функциями, так что модель видит
+   законченные единицы кода.
+3. Ваш сьют один раз гоняется немутированным под `coverage` с контекстом на
+   каждый тест. Этот единственный прогон делает две вещи: доказывает, что
+   сьют зелёный, прежде чем тратятся деньги, и строит карту **какие тесты
+   исполняют какие строки**. Без установленного `pytest-cov` mutagen
+   откатывается на эвристику по имени файла/символу и помечает отчёт
+   `mapping: heuristic`.
+4. Каждая функция отправляется модели вместе с тестами, которые её реально
+   покрывают, с инструкцией произвести баги, которые эти тесты с наименьшей
+   вероятностью поймают. Ответ ограничен JSON-схемой.
+5. Мутации приходят как блоки SEARCH/REPLACE (не диффы — модели путаются в
+   номерах строк). Они применяются сначала точно, затем с нормализацией
+   пробелов и отступов, затем нечётко через `difflib` — и всегда **строго в
+   пределах диапазона строк целевой функции**, так что блок, встречающийся и
+   в соседней функции, не может незаметно мутировать её вместо нужной. Блоки,
+   которые никуда не встали, или дающие код, который не парсится, помечаются
+   `unapplicable`, а не подгоняются силой.
+6. Каждый мутант гоняется в приватной копии репозитория своего воркера, ровно
+   против тех тестов, которые исполняют изменённые им строки, с таймаутом.
+   Мутация на строках, которые **не** исполняет ни один тест, вообще не
+   запускается — на неё ничто не могло бы полагаться — и репортится в
+   отдельной секции `unreached`.
 
-## License
+## Лицензия
 
 MIT
