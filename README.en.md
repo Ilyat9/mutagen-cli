@@ -1,10 +1,10 @@
 Full version (Russian): [README.md](README.md)
 
-# mutagen
+# mutagen-cli
 
 **Your tests are green. Here's what they don't catch.**
 
-mutagen introduces realistic bugs into your code — off-by-one errors, missed
+mutagen-cli introduces realistic bugs into your code — off-by-one errors, missed
 cache invalidation, swapped arguments, inverted conditions — and reruns your
 test suite. Any bug that survives is a gap in your tests, reported as the
 concrete failure your users will hit. The mutants are written by an LLM that
@@ -12,10 +12,27 @@ has read both your function *and* the tests covering it, so it aims at the
 blind spots instead of flipping operators at random.
 
 Real output, excerpted from a run against a third-party repo
-([CogniWeb_Agent](https://github.com/Ilyat9/CogniWeb_Agent), 19 mocked tests,
-all green):
+([semantic-plagiarism-detector](https://github.com/Ilyat9/semantic-plagiarism-detector),
+44 tests, all green):
 
-<img src="assets/mutagen_report.svg" alt="mutagen run: mutation score 12%, two survivors — an off-by-one in history trimming and an inverted captcha check" width="900">
+<img src="assets/mutagen_report.svg" alt="mutagen run: mutation score 21%, two survivors — a spaCy pipeline cache that doesn't key by language, and swapped classification thresholds" width="900">
+
+## Tested on three independent projects
+
+Not just the bundled fixture — three real apps with pre-existing, already-green
+test suites, no source changes made for the tool's sake:
+
+| Project | Scope | Score | Cost |
+| --- | --- | ---: | ---: |
+| [semantic-plagiarism-detector](https://github.com/Ilyat9/semantic-plagiarism-detector) | `core/` (33 functions) | **21%** (5/24) | $0.35 |
+| [cityfeed](https://github.com/Ilyat9/cityfeed) — Telegram news-digest bot | `rank/` | **20%** (5/25) | $0.13 |
+| [cityfeed](https://github.com/Ilyat9/cityfeed) | `dedup/` | **24%** (6/25) | $0.14 |
+| [CogniWeb_Agent](https://github.com/Ilyat9/CogniWeb_Agent) — browser LLM agent | 3 modules, 3 runs | 12% / 5% / 4% | $0.78 |
+
+All four land under 25% on code that already had human review and a green CI —
+a language-blind pipeline cache, swapped threshold values, boundary conditions
+at window edges, inverted security checks. Not one codebase's quirk; the same
+shape of blind spot each time.
 
 ## Quickstart
 
