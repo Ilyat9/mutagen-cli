@@ -197,6 +197,38 @@ def test_missing_pytest_is_not_reported_as_a_red_suite(victim_repo, monkeypatch,
     assert "not green" not in result.output
 
 
+def test_coverage_mapping_is_announced(victim_repo, monkeypatch):
+    seed(victim_repo, {"apply_discount": [SURVIVOR]})
+    result = invoke(
+        victim_repo,
+        ["run", "--all", "--workers", "1", "--python", sys.executable],
+        monkeypatch,
+    )
+    assert result.exit_code == 0, result.output
+    assert "mapping: coverage" in result.output
+    assert "install pytest-cov" not in result.output
+
+
+def test_without_pytest_cov_it_falls_back_to_the_heuristic(victim_repo, monkeypatch, tmp_path):
+    monkeypatch.setattr("mutagen_cli.cli.coverage_map.available", lambda python: False)
+    seed(victim_repo, {"apply_discount": [SURVIVOR]})
+    js = tmp_path / "r.json"
+    result = invoke(
+        victim_repo,
+        ["run", "--all", "--workers", "1", "--python", sys.executable,
+         "--report-json", str(js)],
+        monkeypatch,
+    )
+    assert result.exit_code == 0, result.output
+    assert "mapping: heuristic (install pytest-cov for precise coverage mapping)" in (
+        " ".join(result.output.split())
+    )
+    # The run still works — the heuristic is a fallback, not an error.
+    payload = json.loads(js.read_text())
+    assert payload["test_mapping"] == "heuristic"
+    assert payload["counts"]["survived"] == 1
+
+
 def test_installed_entry_point_runs():
     proc = subprocess.run(
         [sys.executable, "-m", "mutagen_cli.cli", "--version"],

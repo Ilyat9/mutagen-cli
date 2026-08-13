@@ -33,10 +33,16 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
+from mutagen_cli import coverage_map  # noqa: E402
 from mutagen_cli.cache import Cache  # noqa: E402
 from mutagen_cli.generator import mutants_per_target, read_test_context  # noqa: E402
 from mutagen_cli.prompts import MUTANT_SCHEMA, MUTANT_SYSTEM, mutant_user  # noqa: E402
 from mutagen_cli.provider import ENV_KEYS, default_model, reasoning_tag  # noqa: E402
+from mutagen_cli.runner import (  # noqa: E402
+    RunnerConfig,
+    collect_coverage_map,
+    prepare_workspace,
+)
 from mutagen_cli.scope import collect_targets, map_tests  # noqa: E402
 
 FIXTURE = REPO / "tests" / "fixtures" / "victim_project"
@@ -67,6 +73,25 @@ def _normalize(entry) -> list[dict]:
     return [m for m in entry or [] if isinstance(m, dict)]
 
 
+def _map_coverage(repo: Path, targets) -> bool:
+    """Refine `targets` with a coverage map, exactly as `mutagen run` does."""
+    python = sys.executable
+    if not coverage_map.available(python):
+        return False
+    tmp = Path(tempfile.mkdtemp(prefix="mutagen-bench-cov-"))
+    try:
+        workdir = tmp / "w0"
+        prepare_workspace(repo, workdir)
+        cfg = RunnerConfig(root=repo, python=python, timeout=60.0, workers=1)
+        baseline, cmap = collect_coverage_map(cfg, workdir)
+        if not cmap:
+            return False
+        coverage_map.map_targets(cmap, targets)
+        return True
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def seed_cache(
     repo: Path, provider: str, model: str, effort: str, max_mutants: int,
     source: Path = CANNED,
@@ -77,6 +102,10 @@ def seed_cache(
 
     targets = collect_targets(repo, all_files=True, max_files=MAX_FILES)
     map_tests(repo, targets)
+    # The prompt carries the tests that cover the function, so the cache key
+    # depends on the mapping. Mirror exactly what the CLI will do, or every
+    # key whose mapping differs misses and the "offline" run tries to call out.
+    _map_coverage(repo, targets)
     per_target = mutants_per_target(len(targets), max_mutants)
     cache = Cache(repo, enabled=True)
     schema = json.dumps(MUTANT_SCHEMA, sort_keys=True)

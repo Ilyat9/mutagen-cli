@@ -24,11 +24,20 @@ class Target:
     start_line: int
     end_line: int
     source: str
+    # Test files, used for the prompt context and the --dry-run plan.
     test_files: list[str] = field(default_factory=list)
+    # What to hand pytest. Node ids when the coverage map supplied them, the
+    # same file list as `test_files` under the heuristic, empty for "run
+    # everything".
+    test_selection: list[str] = field(default_factory=list)
 
     @property
     def label(self) -> str:
         return f"{self.path}::{self.qualname}"
+
+    @property
+    def selection(self) -> list[str]:
+        return self.test_selection or self.test_files
 
 
 @dataclass
@@ -57,6 +66,11 @@ class Result:
     duration: float = 0.0
     invented_test: Optional[str] = None
     invented_test_status: str = ""  # "verified" | "rejected" | ""
+    # The coverage map says nothing executes the mutated lines. Still a
+    # `survived` verdict — the score does not change shape — but it is a
+    # stronger finding than a survivor that ran: no test could ever have
+    # caught it, because no test reaches the code.
+    no_coverage: bool = False
 
 
 @dataclass

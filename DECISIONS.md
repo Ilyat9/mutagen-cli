@@ -210,8 +210,64 @@ byte-identically, because well-behaved blocks were always in range.
 
 **Residual risk.** This closes misplacement *within* a file. It does not close
 the other artefact route — a mutant run against test files the mapping picked
-wrongly. That one is documented as a limitation in the README rather than
-fixed, because the fix is coverage data, not heuristics.
+wrongly. **Closed by D11**, which replaces the heuristic with coverage data.
+
+## D11 — Test mapping is measured, not guessed
+
+**Problem.** D10 closed misplacement *within* a file and named the remaining
+artefact route: the heuristic mapping (filename similarity + symbol references,
+top three files) can pick tests that cannot kill the mutant while missing the
+one that can. The mutant then survives for a reason that has nothing to do with
+the test suite's quality. This was the largest known source of false survivors.
+
+**A (current).** The baseline run — which happens anyway, to prove the suite is
+green — runs under `pytest-cov` with `--cov-context=test`. That yields, per
+line, the node ids of the tests that executed it. Each mutant is then run
+against the tests covering *the lines that mutant changed*
+(`ApplyResult.start_line..end_line`, not the whole function). The map is built
+once and reused: the code under test is identical for every mutant, and each
+mutant is applied to a pristine copy.
+
+**B.** Keep the heuristic and widen it (more files, more scoring signals).
+
+**C.** Import-graph analysis instead of runtime coverage.
+
+**Recommendation: A.** B tunes a guess; there is no scoring function that
+turns "this file does not mention the function" into "this file exercises it
+through two layers of indirection". C misses everything dynamic —
+fixtures, parametrisation, dependency injection — which is most of a real
+suite. Runtime coverage is the only thing that answers the actual question.
+
+**Consequences accepted:**
+
+- **The baseline now runs the whole suite**, where before it ran only the
+  heuristically selected subset. A map built from a subset could only confirm
+  the guess that produced it. Measured cost on the polygon: 0.25 s → 0.35 s.
+  Per-mutant runs get *faster* in exchange, since the selection is node ids.
+- **Generation moved after the baseline.** It had to, because the prompt
+  carries the covering tests. A welcome side effect: a red suite is now found
+  before any money is spent, not after.
+- **`pytest-cov` is optional, and its absence is stated.** No map means the
+  heuristic, and the report says `mapping: heuristic (install pytest-cov for
+  precise coverage mapping)` in the terminal, the markdown and the JSON. A
+  silent downgrade would be worse than the old behaviour.
+- **The cache key moved**, because the prompt now shows different tests.
+  `scripts/benchmark.py` builds the map the same way through
+  `runner.collect_coverage_map`, or its seeded "offline" run would miss.
+- **`--dry-run` stays on the heuristic** and says so: it must not run the
+  suite.
+
+**New verdict shading: `unreached`.** When the map says nothing executes the
+mutated lines, the mutant is a survivor that we do not run — no test outcome
+can depend on code no test reaches. It stays a `survived` verdict (the score
+keeps exactly the shape it had) but is reported in its own section, because
+"your assertion is too weak" and "nothing runs this at all" are different
+problems with different fixes.
+
+**Residual risk.** A file absent from the map is left on the heuristic rather
+than called uncovered: "never imported" and "excluded by a source filter" look
+identical from here, and guessing wrong in that direction would invent blind
+spots that do not exist.
 
 ---
 

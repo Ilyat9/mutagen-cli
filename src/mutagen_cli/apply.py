@@ -26,6 +26,11 @@ class ApplyResult:
     text: Optional[str] = None
     method: str = ""
     reason: str = ""
+    # 1-based inclusive range of the ORIGINAL lines the replacement covered.
+    # Coverage lookups use this: the tests that matter are the ones that
+    # execute the lines the mutation actually changed.
+    start_line: int = 0
+    end_line: int = 0
 
 
 def _normalize(text: str) -> str:
@@ -106,6 +111,8 @@ def apply_search_replace(
             source,
             "\n".join(src_lines[:start] + replace_lines + src_lines[start + window:]),
             method,
+            start + 1,
+            start + window,
         )
 
     search_stripped = [line.strip() for line in search_lines]
@@ -121,6 +128,8 @@ def apply_search_replace(
                 source,
                 "\n".join(src_lines[:start] + new_lines + src_lines[start + window:]),
                 "whitespace-normalized",
+                start + 1,
+                start + window,
             )
 
     # 3. Same code, different indentation (a very common model slip).
@@ -133,6 +142,8 @@ def apply_search_replace(
                 source,
                 "\n".join(src_lines[:start] + new_lines + src_lines[start + window:]),
                 "reindented",
+                start + 1,
+                start + window,
             )
 
     # 4. Fuzzy: best-scoring window, if it clears the threshold.
@@ -152,6 +163,8 @@ def apply_search_replace(
             source,
             "\n".join(src_lines[:best_start] + new_lines + src_lines[best_start + best_len:]),
             f"fuzzy ({best_ratio:.2f})",
+            best_start + 1,
+            best_start + best_len,
         )
 
     where = " inside the target function" if span else ""
@@ -164,7 +177,9 @@ def apply_search_replace(
     )
 
 
-def _finish(source: str, new_text: str, method: str) -> ApplyResult:
+def _finish(
+    source: str, new_text: str, method: str, start_line: int, end_line: int
+) -> ApplyResult:
     if new_text == source:
         return ApplyResult(False, method=method, reason="mutation is a no-op")
     try:
@@ -175,7 +190,9 @@ def _finish(source: str, new_text: str, method: str) -> ApplyResult:
         return ApplyResult(
             False, method=method, reason=f"result does not parse: line {exc.lineno}"
         )
-    return ApplyResult(True, text=new_text, method=method)
+    return ApplyResult(
+        True, text=new_text, method=method, start_line=start_line, end_line=end_line
+    )
 
 
 def make_diff(path: str, before: str, after: str, context: int = 2) -> str:

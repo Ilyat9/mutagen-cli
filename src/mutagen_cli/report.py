@@ -22,6 +22,9 @@ class Summary:
     counts: Counter = field(default_factory=Counter)
     by_file: dict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     duration: float = 0.0
+    # A subset of `counts[SURVIVED]`, not a verdict of its own: the score keeps
+    # exactly the shape it had before coverage mapping existed.
+    no_coverage: int = 0
 
     @property
     def scored(self) -> int:
@@ -45,6 +48,8 @@ def summarize(results: list[Result], duration: float = 0.0) -> Summary:
     for result in results:
         summary.counts[result.verdict] += 1
         summary.by_file[result.mutant.target.path][result.verdict] += 1
+        if result.no_coverage:
+            summary.no_coverage += 1
     return summary
 
 
@@ -68,8 +73,10 @@ def render_terminal(
     summary: Summary,
     usage: Usage,
     model: str,
+    mapping: str = "heuristic",
 ) -> None:
-    survivors = [r for r in results if r.verdict == SURVIVED]
+    survivors = [r for r in results if r.verdict == SURVIVED and not r.no_coverage]
+    unreached = [r for r in results if r.no_coverage]
 
     headline = Text()
     headline.append("mutation score  ", style="bold")
@@ -110,16 +117,40 @@ def render_terminal(
         )
         for index, result in enumerate(survivors, 1):
             _render_survivor(console, index, result)
-    else:
+    elif not unreached:
         console.print()
         console.print(
             Text("No survivors. Every mutant was caught.", style="bold green")
         )
 
-    _render_footer(console, summary, usage, model)
+    if unreached:
+        console.print()
+        console.print(
+            Text(
+                f"{len(unreached)} mutant(s) in code no test executes at all",
+                style="bold magenta",
+            )
+        )
+        console.print(
+            Text(
+                "Not a weak assertion — an absence. No test reaches these lines, "
+                "so nothing here could ever have failed.",
+                style="dim",
+            )
+        )
+        for index, result in enumerate(unreached, 1):
+            _render_survivor(console, index, result, style="magenta", label="unreached")
+
+    _render_footer(console, summary, usage, model, mapping)
 
 
-def _render_survivor(console: Console, index: int, result: Result) -> None:
+def _render_survivor(
+    console: Console,
+    index: int,
+    result: Result,
+    style: str = "red",
+    label: str = "survivor",
+) -> None:
     mutant = result.mutant
     body = Text()
     body.append(mutant.description or "(no description)", style="bold")
@@ -128,7 +159,12 @@ def _render_survivor(console: Console, index: int, result: Result) -> None:
 
     console.print()
     console.print(
-        Panel(body, title=f"[red]survivor {index}[/red]", border_style="red", expand=False)
+        Panel(
+            body,
+            title=f"[{style}]{label} {index}[/{style}]",
+            border_style=style,
+            expand=False,
+        )
     )
     if result.diff:
         console.print(Syntax(result.diff, "diff", theme="ansi_dark", background_color="default"))
@@ -152,8 +188,15 @@ def _fmt_cost(usage: Usage, model: str) -> str:
     return f"~${usage.cost_usd:.3f}"
 
 
-def _render_footer(console: Console, summary: Summary, usage: Usage, model: str) -> None:
-    bits = [f"{summary.counts[KILLED]} killed", f"{summary.counts[SURVIVED]} survived"]
+def _render_footer(
+    console: Console, summary: Summary, usage: Usage, model: str, mapping: str
+) -> None:
+    # `unreached` is a subset of `survived`, so it is shown in parentheses
+    # rather than as another term that would look additive.
+    survived = f"{summary.counts[SURVIVED]} survived"
+    if summary.no_coverage:
+        survived += f" ({summary.no_coverage} of them unreached by any test)"
+    bits = [f"{summary.counts[KILLED]} killed", survived]
     for verdict, label in ((TIMEOUT, "timeout"), (ERROR, "error"), (UNAPPLICABLE, "unapplicable")):
         if summary.counts[verdict]:
             bits.append(f"{summary.counts[verdict]} {label}")
@@ -179,6 +222,15 @@ def _render_footer(console: Console, summary: Summary, usage: Usage, model: str)
             )
         )
 
+    if mapping != "coverage":
+        console.print(
+            Text(
+                "mapping: heuristic (install pytest-cov for precise coverage "
+                "mapping)",
+                style="yellow",
+            )
+        )
+
     if summary.unapplicable_rate > 0.15:
         console.print(
             Text(
@@ -192,8 +244,38 @@ def _render_footer(console: Console, summary: Summary, usage: Usage, model: str)
 # --- exports ------------------------------------------------------------------
 
 
-def render_markdown(results: list[Result], summary: Summary, usage: Usage, model: str) -> str:
-    survivors = [r for r in results if r.verdict == SURVIVED]
+def _markdown_mutant(out: list[str], index: int, result: Result) -> None:
+    mutant = result.mutant
+    out.append(f"### {index}. {mutant.description or mutant.id}\n")
+    out.append(f"`{mutant.target.label}` — _{mutant.bug_category}_\n")
+    if result.diff:
+        out.append("```diff")
+        out.append(result.diff)
+        out.append("```\n")
+    if result.invented_test:
+        status = {
+            "verified": "Verified: passes on the current code, fails on the mutant.",
+            "rejected": "Not verified: fails on the current code as "
+                        "written; needs editing.",
+            "weak": "Not verified: passes on the current code but does "
+                    "not catch this mutant.",
+        }.get(result.invented_test_status, "")
+        out.append("**A test that would catch it**" + (f" — {status}" if status else ""))
+        out.append("")
+        out.append("```python")
+        out.append(result.invented_test.strip())
+        out.append("```\n")
+
+
+def render_markdown(
+    results: list[Result],
+    summary: Summary,
+    usage: Usage,
+    model: str,
+    mapping: str = "heuristic",
+) -> str:
+    survivors = [r for r in results if r.verdict == SURVIVED and not r.no_coverage]
+    unreached = [r for r in results if r.no_coverage]
     out: list[str] = []
     out.append("# Mutation report\n")
     out.append(
@@ -214,29 +296,19 @@ def render_markdown(results: list[Result], summary: Summary, usage: Usage, model
     if survivors:
         out.append(f"## {len(survivors)} bugs your tests would not catch\n")
         for index, result in enumerate(survivors, 1):
-            mutant = result.mutant
-            out.append(f"### {index}. {mutant.description or mutant.id}\n")
-            out.append(f"`{mutant.target.label}` — _{mutant.bug_category}_\n")
-            if result.diff:
-                out.append("```diff")
-                out.append(result.diff)
-                out.append("```\n")
-            if result.invented_test:
-                status = {
-                    "verified": "Verified: passes on the current code, fails on the mutant.",
-                    "rejected": "Not verified: fails on the current code as "
-                                "written; needs editing.",
-                    "weak": "Not verified: passes on the current code but does "
-                            "not catch this mutant.",
-                }.get(result.invented_test_status, "")
-                out.append("**A test that would catch it**" + (f" — {status}" if status else ""))
-                out.append("")
-                out.append("```python")
-                out.append(result.invented_test.strip())
-                out.append("```\n")
-    else:
+            _markdown_mutant(out, index, result)
+    elif not unreached:
         out.append("## No survivors\n")
         out.append("Every mutant was caught by the existing tests.\n")
+
+    if unreached:
+        out.append(f"## {len(unreached)} mutants in code no test executes\n")
+        out.append(
+            "No test reaches these lines, so nothing here could ever have "
+            "failed. This is an absence of coverage, not a weak assertion.\n"
+        )
+        for index, result in enumerate(unreached, 1):
+            _markdown_mutant(out, index, result)
 
     tallies = ", ".join(
         f"{summary.counts[v]} {label}"
@@ -246,20 +318,34 @@ def render_markdown(results: list[Result], summary: Summary, usage: Usage, model
         )
         if summary.counts[v]
     )
+    if summary.no_coverage:
+        tallies += f" ({summary.no_coverage} of the survivors unreached by any test)"
     failed = f", {usage.failed_calls} failed" if usage.failed_calls else ""
+    note = (
+        "" if mapping == "coverage"
+        else " Test mapping: heuristic — install pytest-cov for coverage-based mapping."
+    )
     out.append("---\n")
     out.append(
         f"{tallies}. {usage.calls} LLM calls ({usage.cached_calls} cached{failed}) with "
-        f"`{model}`, {_fmt_cost(usage, model)}, {summary.duration:.1f}s.\n"
+        f"`{model}`, {_fmt_cost(usage, model)}, {summary.duration:.1f}s.{note}\n"
     )
     return "\n".join(out)
 
 
-def render_json(results: list[Result], summary: Summary, usage: Usage, model: str) -> str:
+def render_json(
+    results: list[Result],
+    summary: Summary,
+    usage: Usage,
+    model: str,
+    mapping: str = "heuristic",
+) -> str:
     payload = {
         "model": model,
         "score": summary.score,
         "counts": dict(summary.counts),
+        "test_mapping": mapping,
+        "no_coverage": summary.no_coverage,
         "duration_seconds": round(summary.duration, 2),
         "usage": {
             "calls": usage.calls,
@@ -283,6 +369,7 @@ def render_json(results: list[Result], summary: Summary, usage: Usage, model: st
                 "duration_seconds": round(r.duration, 3),
                 "suggested_test": r.invented_test,
                 "suggested_test_status": r.invented_test_status,
+                "no_coverage": r.no_coverage,
             }
             for r in results
         ],

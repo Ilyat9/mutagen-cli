@@ -14,7 +14,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
+from . import coverage_map
 from .apply import apply_search_replace, make_diff
+from .coverage_map import CoverageMap
 from .models import ERROR, KILLED, SURVIVED, TIMEOUT, UNAPPLICABLE, Mutant, Result
 from .scope import SKIP_DIRS
 
@@ -64,6 +66,7 @@ def run_pytest(
     test_paths: list[str],
     timeout: float,
     extra_args: Optional[list[str]] = None,
+    collect_coverage: bool = False,
 ) -> tuple[int, str, float]:
     cmd = [
         python, "-m", "pytest",
@@ -71,6 +74,9 @@ def run_pytest(
         "-q", "--no-header", "-p", "no:cacheprovider",
         *(extra_args or []),
     ]
+    if collect_coverage:
+        coverage_map.write_config(workdir)
+        cmd.extend(coverage_map.pytest_args(workdir))
     # Without this, a mutation that does not change a file's size (min -> max,
     # < -> <=) can be masked by a .pyc written in the same second: CPython
     # invalidates on mtime+size, so the stale bytecode is reused and the mutant
@@ -85,6 +91,9 @@ def run_pytest(
     if os.environ.get("PYTHONPATH"):
         shadow.append(os.environ["PYTHONPATH"])
     env["PYTHONPATH"] = os.pathsep.join(shadow)
+    if collect_coverage:
+        env["COVERAGE_FILE"] = str(workdir / coverage_map.DATA_FILE)
+        env["COVERAGE_CORE"] = coverage_map.COVERAGE_CORE
 
     started = time.monotonic()
     proc = subprocess.Popen(
@@ -111,15 +120,15 @@ def run_pytest(
 
 
 def _selection(mutants: list[Mutant]) -> list[str]:
-    """Union of the test files mapped to these mutants.
+    """Union of the tests mapped to these mutants.
 
     Empty means "no mapping for at least one target", i.e. run everything.
     """
     selected: list[str] = []
     for mutant in mutants:
-        if not mutant.target.test_files:
+        if not mutant.target.selection:
             return []
-        for rel in mutant.target.test_files:
+        for rel in mutant.target.selection:
             if rel not in selected:
                 selected.append(rel)
     return selected
@@ -142,17 +151,40 @@ class Baseline:
         return "No module named pytest" in self.output
 
 
-def check_baseline(cfg: RunnerConfig, mutants: list[Mutant], workdir: Path) -> Baseline:
-    """Run the selected tests unmutated.
+def check_baseline(
+    cfg: RunnerConfig,
+    mutants: list[Mutant],
+    workdir: Path,
+    collect_coverage: bool = False,
+) -> Baseline:
+    """Run the tests unmutated.
 
     If the suite is already red, mutation numbers are meaningless — every
     mutant would look killed. Better to stop and say so.
+
+    With `collect_coverage` this is also where the per-test coverage map comes
+    from, which means running the WHOLE suite: a map built from a subset could
+    only ever tell us about the tests we already guessed at.
     """
-    paths = _selection(mutants)
+    paths = [] if collect_coverage else _selection(mutants)
     code, output, duration = run_pytest(
-        workdir, cfg.python, paths, max(cfg.timeout * 4, 120.0), cfg.pytest_args
+        workdir, cfg.python, paths, max(cfg.timeout * 4, 300.0), cfg.pytest_args,
+        collect_coverage=collect_coverage,
     )
     return Baseline(code == EXIT_OK, output, duration, paths)
+
+
+def collect_coverage_map(cfg: RunnerConfig, workdir: Path) -> tuple[Baseline, CoverageMap]:
+    """Instrumented baseline plus the map it produced.
+
+    One entry point so the CLI and `scripts/benchmark.py` build the map the
+    same way — the map feeds the generation prompt, so a benchmark that mapped
+    differently would prompt differently and miss the cache.
+    """
+    baseline = check_baseline(cfg, [], workdir, collect_coverage=True)
+    if not baseline.green:
+        return baseline, CoverageMap()
+    return baseline, coverage_map.load(workdir, cfg.root)
 
 
 def summarize_failures(output: str, limit: int = 4) -> str:
@@ -187,6 +219,7 @@ def execute(
     mutants: list[Mutant],
     workdirs: list[Path],
     on_result: Optional[Callable[[Result], None]] = None,
+    coverage: Optional[CoverageMap] = None,
 ) -> list[Result]:
     results: list[Result] = []
     lock = threading.Lock()
@@ -219,9 +252,29 @@ def execute(
                 continue
 
             diff = make_diff(rel, original, applied.text)
+
+            # Which tests actually reach the lines this mutation changed?
+            paths = mutant.target.selection
+            if coverage and coverage.knows(rel):
+                covering = coverage.tests_for(rel, applied.start_line, applied.end_line)
+                if not covering:
+                    # Nothing executes these lines, so no test outcome can
+                    # depend on them. Running the suite to watch it pass would
+                    # only cost time and prove what the map already states.
+                    _record(
+                        Result(
+                            mutant,
+                            SURVIVED,
+                            detail="no test executes the mutated lines",
+                            diff=diff,
+                            no_coverage=True,
+                        )
+                    )
+                    continue
+                paths = coverage_map.selection_for(covering)
+
             file_path.write_text(applied.text, encoding="utf-8")
             try:
-                paths = mutant.target.test_files or []
                 code, output, duration = run_pytest(
                     workdir, cfg.python, paths, cfg.timeout, ["-x", *cfg.pytest_args]
                 )

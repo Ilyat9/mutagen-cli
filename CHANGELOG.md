@@ -84,9 +84,10 @@ case that would otherwise have produced a wrong number.
 
 ### Speed and cost
 
-- **`[improvement]` Relevant tests only.** Functions are mapped to test files by
-  filename and symbol reference; a mutant runs just those. No mapping falls back
-  to the full suite rather than skipping.
+- **`[improvement]` Relevant tests only.** A mutant runs just the tests that
+  reach it, not the whole suite. Originally a filename/symbol heuristic; now
+  measured from coverage, with that heuristic kept as the fallback — see
+  "Coverage-based test mapping" below.
 - **`[improvement]` `-x` on mutant runs.** We only need to know *whether*
   something failed, so stop at the first failure.
 - **`[improvement]` Adaptive timeout.** The baseline run is timed and the
@@ -131,7 +132,7 @@ case that would otherwise have produced a wrong number.
 - Polygon under `tests/fixtures/victim_project/`: 15 functions across 5 modules,
   36 passing tests, 18 of them deliberately worthless, with the blind spots they
   leave documented in `WEAK_TESTS.md`.
-- 74 tests for mutagen itself. They run offline and for free — the pipeline
+- 86 tests for mutagen itself. They run offline and for free — the pipeline
   tests use a replay provider and real pytest subprocesses, and the CLI tests
   pre-seed the disk cache so no API key is needed. `ruff` config in
   `pyproject.toml`; `ruff check .` is clean.
@@ -147,6 +148,45 @@ case that would otherwise have produced a wrong number.
   HTTP can answer them offline and have its mutants fed back through the real
   pipeline via `benchmark.py --replies`. This is what made Phase 4's mutant
   quality measurable without an API key.
+
+### Coverage-based test mapping
+
+- **Which tests run against a mutant is now measured, not guessed.** The
+  baseline run — already needed to prove the suite is green — runs under
+  `pytest-cov` with `--cov-context=test`, producing a per-line map of the tests
+  that executed it. Each mutant is then run against the tests covering exactly
+  the lines *that mutant* changed. This closes the residual risk left open by
+  D10: a killing test in a file the filename/symbol heuristic never picked used
+  to produce a false survivor. Regression test
+  `test_the_heuristic_misses_the_killing_test` pins the failing case, and
+  `test_coverage_mapping_finds_the_killing_test` shows the same mutant killed.
+  See DECISIONS.md D11.
+- **New report category: `unreached`.** When nothing executes the mutated
+  lines, the mutant is not run at all — no test outcome can depend on code no
+  test reaches — and is reported in its own section. It stays a `survived`
+  verdict, so the mutation score keeps exactly the shape it had. On the polygon
+  this surfaces `Page.has_prev`, which none of the 36 tests ever reads.
+  `usage`-style fields `test_mapping` and `no_coverage` are in the JSON report.
+- **The heuristic is a fallback, not a removal.** Without `pytest-cov` in the
+  interpreter that runs the tests, mapping falls back to the heuristic and says
+  so — `mapping: heuristic (install pytest-cov for precise coverage mapping)` —
+  in the terminal, the markdown report and the JSON. `--dry-run` stays on the
+  heuristic, since it must not run your suite, and labels itself accordingly.
+- **`[improvement]` coverage's default core silently loses contexts.**
+  `COVERAGE_CORE=sysmon`, the default on Python 3.12+, disables line events
+  once a line has been seen, so only the *first* test to reach a line is
+  recorded against it. Measured on the polygon: `victim/pricing.py:16` came
+  back with 1 context under `sysmon` and 5 under `ctrace`. A map like that
+  would send mutagen to run a strict subset of the covering tests — the same
+  false-survivor bug in a much subtler form. The instrumented run forces
+  `COVERAGE_CORE=ctrace`, guarded by
+  `test_every_covering_test_is_recorded_not_just_the_first`.
+- **`[improvement]` Generation now happens after the baseline**, because the
+  prompt carries the covering tests. Side effect worth having: a red suite is
+  found before any money is spent instead of after.
+- Baseline cost of instrumentation on the polygon (36 tests): 0.25 s → 0.35 s,
+  paid once per run. Per-mutant runs get faster — the selection is test node
+  ids rather than whole files. Numbers in BENCHMARKS.md Run F.
 
 ### Pre-publication audit (2026-08-13)
 
@@ -212,6 +252,10 @@ their fixes:
 - Audit re-verification (Run E, 2026-08-13): Runs A and B reproduced from a
   clean copy with a fresh venv, plus two live OpenRouter runs ($0.014 and
   $0.016) exercising the HTTP, structured-output, cost and `--invent` paths.
+- Coverage mapping (Run F, 2026-08-13): Runs A and B re-measured with the
+  coverage-based mapping. Verdict counts identical (28 mutants 12/16; 43
+  mutants 8/35) — the polygon's layout is one the heuristic already got right
+  — with 1 and 5 survivors respectively reclassified as `unreached`.
 - Known gap found by the measurement: the model clusters several mutants on one
   line (3 on `__len__`'s single `return`), reporting one blind spot repeatedly.
   Deduplicating survivors by mutated line would tighten the report.

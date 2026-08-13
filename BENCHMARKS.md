@@ -5,6 +5,8 @@ been measured, it says so rather than being estimated.
 
 ## Run A — engine validation (offline, deterministic)
 
+> **Superseded for the mapping question by [Run F](#run-f--coverage-based-test-mapping-2026-08-13).** The verdict counts below still reproduce exactly; what changed is that one of the 16 survivors is now reported as *unreached* rather than merely surviving.
+
 ```bash
 python scripts/benchmark.py
 ```
@@ -60,6 +62,8 @@ generates different mutants.
 - **Cost and latency of generation.** No API calls happen.
 
 ## Run B — mutant quality, model-written, offline
+
+> **Superseded for the mapping question by [Run F](#run-f--coverage-based-test-mapping-2026-08-13).** Counts reproduce exactly; 5 of the 35 survivors are now reported as *unreached*.
 
 ```bash
 python scripts/dump_prompts.py --out prompts/
@@ -293,6 +297,80 @@ range — and it did not: Runs A and B reproduce byte-identically, because every
 canned and model-written block already matched inside its own function. The
 fix removes a failure mode that had not yet fired on this polygon, not a
 result. See CHANGELOG.
+
+## Run F — coverage-based test mapping, 2026-08-13
+
+**Runs A and B above are superseded by this section for the mapping question**;
+their verdict counts still stand (see below — they did not move).
+
+`mutagen run` now maps functions to tests by measuring, not guessing: the
+baseline suite runs once under `pytest-cov` with `--cov-context=test`, and each
+mutant is then run against the tests that execute the lines it changed.
+
+```bash
+python scripts/benchmark.py                                  # Run A, remapped
+python scripts/benchmark.py --replies live_replies.json --max-mutants 50
+```
+
+| | Run A (heuristic) | Run A (coverage) | Run B (heuristic) | Run B (coverage) |
+| --- | --- | --- | --- | --- |
+| Mutants | 28 | 28 | 43 | 43 |
+| killed | 12 | 12 | 8 | 8 |
+| survived | 16 | 16 | 35 | 35 |
+| — of which **unreached** | n/a | **1** | n/a | **5** |
+| unapplicable | 0 | 0 | 0 | 0 |
+| **Mutation score** | 42.9% | **42.9%** | 18.6% | **18.6%** |
+| Golden-standard verdicts | 28/28 | **28/28** | — | — |
+
+**The score did not move, and that is the honest result.** The polygon has a
+textbook layout — `victim/cache.py` ↔ `tests/test_cache.py` — which is exactly
+the case the filename heuristic gets right. Coverage cannot improve on a
+mapping that was already correct; what it does is stop the mapping from being a
+guess. The regression test
+`test_the_heuristic_misses_the_killing_test` builds the layout where the
+heuristic *does* fail (the killing test names neither the function nor its
+module, three vacuous decoys outrank it) and shows the mutant reported as a
+survivor under the heuristic and `killed` under coverage.
+
+What did change is the *shape* of the report. Mutants in code no test executes
+are now separated out:
+
+| Run | Unreached mutants | Where |
+| --- | --- | --- |
+| A | 1 | `victim/pagination.py::Page.has_prev` |
+| B | 5 | `Page.has_prev`, plus 4 more on the same property |
+
+`Page.has_prev` is never read by any of the 36 tests. Under the old report that
+was one survivor among sixteen; now it is a different kind of finding —
+not "your assertion is too weak" but "nothing runs this code at all".
+
+### Cost of the instrumented baseline
+
+Measured on the polygon (36 tests), best of three:
+
+| | Baseline duration |
+| --- | --- |
+| Plain | 0.25 s |
+| With `--cov --cov-context=test` | 0.35 s |
+
+About +40% on the one baseline run, ~0.1 s absolute here. It is paid once per
+`mutagen run`: the code under test is identical for every mutant, so the map is
+built on the baseline and reused. Per-mutant runs get *faster*, because the
+selection is node ids rather than whole files.
+
+### ⚠️ coverage's default core silently loses contexts
+
+`COVERAGE_CORE=sysmon` — the default on Python 3.12+ — disables line events
+once a line has been seen, so only the **first** test to reach a line is
+recorded against it. Measured on the polygon, `victim/pricing.py:16` came back
+with 1 context under `sysmon` and 5 under `ctrace`, with the same suite.
+
+A map like that is worse than no map: it would send mutagen to run a strict
+subset of the covering tests and report false survivors — the exact bug this
+feature exists to remove, in a form much harder to notice. mutagen therefore
+forces `COVERAGE_CORE=ctrace` for the instrumented run, and
+`test_every_covering_test_is_recorded_not_just_the_first` fails if that is
+removed.
 
 ## Determinism
 

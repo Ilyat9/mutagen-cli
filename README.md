@@ -18,6 +18,8 @@ Real output, from the sample project in `tests/fixtures/victim_project` — 36
 tests, all green, half of them deliberately worthless:
 
 ```
+mapping: coverage (15/15 function(s) mapped from a 0.5s instrumented baseline; 1 reached by no test)
+
 ╭───────────────────────────────────────────────────────╮
 │ mutation score  43%   (12 killed / 28 viable mutants) │
 ╰───────────────────────────────────────────────────────╯
@@ -29,7 +31,7 @@ victim/parsing.py          2         3    40%
 victim/pricing.py          1         3    25%
 victim/text.py             2         2    50%
 
-16 bugs your tests would not catch
+15 bugs your tests would not catch
 
 ╭──────────────────────────── survivor 11 ─────────────────────────────╮
 │ the discount cap acts as a floor, so capped promotions give away     │
@@ -42,6 +44,24 @@ victim/text.py             2         2    50%
      if max_discount is not None:
 -        discount = min(discount, max_discount)
 +        discount = max(discount, max_discount)
+
+1 mutant(s) in code no test executes at all
+Not a weak assertion — an absence. No test reaches these lines, so nothing here
+could ever have failed.
+
+╭─────────────────────────────── unreached 1 ────────────────────────────────╮
+│ the first page reports a previous page, so back buttons render on page one │
+│ victim/pagination.py::Page.has_prev   [boundary_condition]                 │
+╰────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page >= 1
+
+12 killed  16 survived (1 of them unreached by any test)
 ```
 
 Reproduce it yourself: `python scripts/benchmark.py` (offline, deterministic,
@@ -78,8 +98,8 @@ mutagen run
 ```
 
 That's it. No config file. `mutagen run` diffs your working tree against `main`,
-mutates only the functions you changed, and runs only the tests that look
-related. See [Providers](#providers) if you'd rather talk to Anthropic directly.
+mutates only the functions you changed, and runs only the tests that actually
+cover them. See [Providers](#providers) if you'd rather talk to Anthropic directly.
 
 ## Providers
 
@@ -192,7 +212,8 @@ jobs:
 | `--python PATH` | project venv | Interpreter used to run your tests. |
 
 LLM responses are cached on disk per function, so re-running after editing one
-function only pays for that function.
+function only pays for that function. The cache key includes the tests shown to
+the model, so a change in coverage correctly misses the cache.
 
 ## What the verdicts mean
 
@@ -201,6 +222,7 @@ function only pays for that function.
 | **killed** | A test failed. Good — the bug would have been caught. |
 | **survived** | Every test still passed. This is a hole in your suite. |
 | **timeout** | The mutant probably created an infinite loop. Counted separately, not as a kill. |
+| **survived (unreached)** | A survivor of a stronger kind: no test executes the mutated lines at all, so nothing could ever have failed. Needs a coverage map; scored as a survivor. |
 | **unapplicable** | The edit couldn't be placed in the file, or didn't parse. Excluded from the score entirely. |
 | **error** | pytest could not run (collection error, no tests). Excluded from the score. |
 
@@ -211,6 +233,8 @@ denominator — counting them as kills would flatter the score for no reason.
 ## Requirements
 
 - Python 3.10+
+- `pytest-cov` in the interpreter that runs your tests, for coverage-based test
+  mapping. Optional — without it mutagen falls back to a heuristic and says so.
 - A pytest suite that currently passes. mutagen checks this first and refuses to
   run against a red suite, because every mutant would look "killed".
 - An OpenRouter API key in `OPENROUTER_API_KEY` (get one at
@@ -239,14 +263,11 @@ cache so no API key is involved.
 - **Equivalent mutants still slip through.** The prompt works hard to forbid
   mutations that don't change behaviour, and most of what remains is real, but
   not all of it. A "survivor" is a lead to investigate, not a proven gap.
-- **Test mapping is a heuristic** (filename match plus symbol references). When
-  it finds nothing it falls back to your whole suite, which is correct but slow.
-  When it finds the *wrong* three files — plausible in a repo that vendors
-  another project's tests, or where the real coverage lives in a file that never
-  names the function — the mutant runs against tests that could not kill it and
-  is reported as a survivor. That is the main remaining source of false
-  survivors; `--dry-run` prints the mapping so you can check it before spending
-  anything.
+- **Precise test mapping needs `pytest-cov`** in the interpreter that runs your
+  tests. With it, mutagen measures which tests execute which lines. Without it
+  it falls back to a filename/symbol heuristic and says so in the report — and
+  a heuristic that picks the wrong files reports mutants as survivors when the
+  test that would kill them simply never ran.
 - **Each worker copies your repo** into a temp directory. Large repos with
   large untracked directories will feel that.
 - **Your working tree is never touched** — except by `--invent-apply`, which
@@ -259,18 +280,25 @@ cache so no API key is involved.
 1. `git diff` against the merge base → changed line ranges (committed *and*
    uncommitted, plus untracked files).
 2. `ast` maps those lines to whole functions, so the model sees complete units.
-3. Each function is sent to the model together with the tests that reference it,
-   with instructions to produce bugs the tests look least likely to catch.
-   Responses are constrained to a JSON schema.
-4. Mutations come back as SEARCH/REPLACE blocks (not diffs — models get line
+3. Your suite runs once, unmutated, under `coverage` with a per-test context.
+   That single run does two jobs: it proves the suite is green before any money
+   is spent, and it produces the map of **which tests execute which lines**.
+   Without `pytest-cov` installed, mutagen falls back to a filename/symbol
+   heuristic and labels the report `mapping: heuristic`.
+4. Each function is sent to the model together with the tests that actually
+   cover it, with instructions to produce bugs those tests look least likely to
+   catch. Responses are constrained to a JSON schema.
+5. Mutations come back as SEARCH/REPLACE blocks (not diffs — models get line
    numbers wrong). They are applied exactly where possible, then with
    whitespace and indentation normalisation, then fuzzily via `difflib` — and
    always **inside the target function's own line range**, so a block that also
    occurs in a neighbouring function cannot silently mutate that one instead.
    Blocks that can't be placed there, or that produce code which doesn't parse,
    are marked unapplicable rather than guessed at.
-5. Each mutant runs in a worker's private copy of the repo, against only the
-   relevant tests, with a timeout.
+6. Each mutant runs in a worker's private copy of the repo, against exactly
+   the tests that execute the lines it changed, with a timeout. A mutation on
+   lines **no** test executes is not run at all — nothing could depend on it —
+   and is reported as `unreached` in its own section.
 
 ## License
 
