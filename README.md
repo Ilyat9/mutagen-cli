@@ -2,6 +2,9 @@
 
 # mutagen-cli
 
+[![CI](https://github.com/Ilyat9/mutagen-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Ilyat9/mutagen-cli/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/mutagen-cli)](https://pypi.org/project/mutagen-cli/)
+
 **Ваши тесты зелёные. Вот что они не проверяют.**
 
 mutagen-cli подсаживает в код правдоподобные баги — off-by-one, забытую

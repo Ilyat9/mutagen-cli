@@ -2,6 +2,9 @@ Full version (Russian): [README.md](README.md)
 
 # mutagen-cli
 
+[![CI](https://github.com/Ilyat9/mutagen-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Ilyat9/mutagen-cli/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/mutagen-cli)](https://pypi.org/project/mutagen-cli/)
+
 **Your tests are green. Here's what they don't catch.**
 
 mutagen-cli introduces realistic bugs into your code — off-by-one errors, missed
