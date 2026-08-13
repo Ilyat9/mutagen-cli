@@ -97,6 +97,7 @@ def generate(
                 usage.cost_usd += reply.cost_usd
 
         produced = 0
+        seen: set[tuple[str, str, str]] = set()
         for index, raw in enumerate(reply.data.get("mutants", [])):
             if len(mutants) >= max_mutants:
                 break
@@ -104,6 +105,13 @@ def generate(
             replace = raw.get("replace_block", "")
             if not search.strip() or search == replace:
                 continue
+            dedupe_key = (target.label, search, replace)
+            if dedupe_key in seen:
+                warnings.append(
+                    f"{target.label}: dropped a duplicate mutant (same search/replace)"
+                )
+                continue
+            seen.add(dedupe_key)
             mutants.append(
                 Mutant(
                     target=target,

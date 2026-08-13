@@ -88,6 +88,22 @@ def test_generate_drops_noop_mutants(victim_repo):
     assert len(mutants) == 1
 
 
+def test_generate_dedupes_identical_mutants_in_one_reply(victim_repo):
+    # Two mutants with the same (target, search_block, replace_block) are the
+    # same edit twice — keep the first, drop the rest.
+    targets = [t for t in collect_targets(victim_repo, all_files=True)
+               if t.qualname == "apply_discount"]
+    duplicate = dict(MUTANT)
+    other = dict(MUTANT, replace_block="        discount = 0")
+    mutants, _, warnings = generate(
+        victim_repo, targets, ReplayProvider([reply(MUTANT, duplicate, other)]), "m"
+    )
+    assert len(mutants) == 2
+    assert mutants[0].replace_block == MUTANT["replace_block"]
+    assert mutants[1].replace_block == "        discount = 0"
+    assert any("duplicate" in w for w in warnings)
+
+
 def test_generate_honours_max_mutants(victim_repo):
     targets = [t for t in collect_targets(victim_repo, all_files=True)
                if t.qualname == "apply_discount"]

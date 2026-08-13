@@ -100,6 +100,8 @@ usually one to four lines.
 4. `replace_block` must keep the same indentation as `search_block`.
 5. Do not mutate a docstring, comment, or logging call on its own.
 6. Prefer mutations the shown tests look least likely to catch.
+7. Do not produce two mutants with the same `search_block` within this \
+function. Each mutant must target a distinct span.
 
 `description` is read by a human in a report. Write it as the bug, not as the \
 edit: "cache entries survive an update, so callers keep reading stale values" \
