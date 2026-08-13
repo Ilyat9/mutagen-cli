@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-# coverage's `sysmon` core — the default on Python 3.12+ — disables line events
+# coverage's `sysmon` core — the default on Python 3.14+ — disables line events
 # once a line has been seen, so only the FIRST test to execute a line is
 # recorded against it. That silently produces a map missing most of its
 # contexts, which is worse than no map at all: it would send us to run a subset
