@@ -66,7 +66,7 @@ about the ones you didn't.
 Full docs, provider setup, CI/GitHub Action, flags, benchmarks, and the
 project's origin story (two separate bugs in the tool itself, caught by hand,
 along the way): see the
-[Russian README](README.md#история-проекта-от-идеи-до-готового-инструмента) —
+[Russian README](README.md#история-проекта) —
 it's the maintained one.
 
 ## License
