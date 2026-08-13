@@ -49,6 +49,9 @@ FIXTURE = REPO / "tests" / "fixtures" / "victim_project"
 CANNED = REPO / "tests" / "fixtures" / "canned_mutants.json"
 MAX_MUTANTS = 40
 MAX_FILES = 20
+# Must match the `max_tokens` default in AnthropicProvider/OpenRouterProvider
+# (provider.py) — it's part of the cache key.
+DEFAULT_MAX_TOKENS = 16000
 
 
 def git(args, cwd):
@@ -120,13 +123,19 @@ def seed_cache(
             ]
         }
         user = mutant_user(target, read_test_context(repo, target), per_target)
-        # Must mirror the provider's cache key exactly, provider name included.
+        # Must mirror the provider's cache key exactly, including max_tokens
+        # and the sort_keys=True schema serialization (see AnthropicProvider
+        # / OpenRouterProvider.complete_json in provider.py).
         if provider == "openrouter":
             key = Cache.key(
-                "openrouter", model, reasoning_tag(False), MUTANT_SYSTEM, user, schema
+                "openrouter", model, reasoning_tag(False), str(DEFAULT_MAX_TOKENS),
+                MUTANT_SYSTEM, user, schema,
             )
         else:
-            key = Cache.key("anthropic", model, effort, MUTANT_SYSTEM, user, schema)
+            key = Cache.key(
+                "anthropic", model, effort, str(DEFAULT_MAX_TOKENS),
+                MUTANT_SYSTEM, user, schema,
+            )
         cache.put(key, {"data": payload})
 
     return expected
