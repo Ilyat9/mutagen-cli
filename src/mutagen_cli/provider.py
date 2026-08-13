@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -19,6 +20,7 @@ from .cache import Cache
 # USD per million tokens (input, output). Anthropic entries are list prices;
 # the OpenRouter entries were taken from openrouter.ai on 2026-08-13. Override
 # any of them with a "prices" table in the config file (see load_config).
+PRICES_DATE = "2026-08-13"
 PRICES = {
     "claude-opus-5": (5.0, 25.0),
     "claude-opus-4-8": (5.0, 25.0),
@@ -289,6 +291,14 @@ class OpenRouterProvider:
     provider_name = "openrouter"
     BASE_URL = "https://openrouter.ai/api/v1"
 
+    # Only transient failures are worth retrying: a rate limit or a server-side
+    # hiccup often clears in seconds, but a 4xx other than 429 (bad request,
+    # auth failure, unsupported model) means the *next* request will fail
+    # identically, so retrying it would just burn time and quota.
+    MAX_RETRIES = 2
+    RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+    MAX_BACKOFF_SECONDS = 30.0
+
     def __init__(
         self,
         model: str = DEFAULT_OPENROUTER_MODEL,
@@ -342,6 +352,39 @@ class OpenRouterProvider:
             payload["reasoning"] = {"enabled": False}
         return payload
 
+    def _backoff_seconds(self, attempt: int, retry_after: Optional[str]) -> float:
+        if retry_after:
+            try:
+                delay = float(retry_after)
+            except ValueError:
+                delay = 2**attempt
+        else:
+            delay = 2**attempt
+        return min(delay, self.MAX_BACKOFF_SECONDS)
+
+    def _post_with_retries(self, client: httpx.Client, payload: dict) -> httpx.Response:
+        """POST with retries for transient failures only.
+
+        A non-retryable status (any 4xx but 429) is returned as-is on the
+        first attempt — the caller decides what to do with it (e.g. the
+        structured-output-unsupported fallback below).
+        """
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                response = client.post("/chat/completions", json=payload)
+            except (httpx.ConnectError, httpx.ReadTimeout) as exc:
+                last_exc = exc
+                if attempt >= self.MAX_RETRIES:
+                    raise ProviderError(f"OpenRouter request failed: {exc}") from exc
+                time.sleep(self._backoff_seconds(attempt, None))
+                continue
+            if response.status_code in self.RETRYABLE_STATUS and attempt < self.MAX_RETRIES:
+                time.sleep(self._backoff_seconds(attempt, response.headers.get("retry-after")))
+                continue
+            return response
+        raise ProviderError(f"OpenRouter request failed: {last_exc}")  # pragma: no cover
+
     def complete_json(self, system: str, user: str, schema: dict) -> Reply:
         # The provider name is part of the cache key: identical prompts to two
         # providers must not share an entry. So is the reasoning toggle — it
@@ -359,15 +402,15 @@ class OpenRouterProvider:
 
         client = self._get_client()
         try:
-            response = client.post(
-                "/chat/completions", json=self._payload(system, user, schema, True)
+            response = self._post_with_retries(
+                client, self._payload(system, user, schema, True)
             )
             # Not every model routed through OpenRouter supports structured
             # outputs; on a 400 retry once without response_format and parse
             # the reply tolerantly instead.
             if response.status_code == 400:
-                response = client.post(
-                    "/chat/completions", json=self._payload(system, user, schema, False)
+                response = self._post_with_retries(
+                    client, self._payload(system, user, schema, False)
                 )
             response.raise_for_status()
         except httpx.HTTPError as exc:

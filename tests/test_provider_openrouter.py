@@ -260,6 +260,106 @@ def test_openrouter_provider_raises_on_reply_missing_the_mutants_key():
         provider.complete_json("sys", "user", MUTANT_SCHEMA)
 
 
+def test_transient_429_then_200_succeeds_with_one_retry(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr("mutagen_cli.provider.time.sleep", lambda s: sleeps.append(s))
+
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(429, json={"error": {"message": "rate limited"}})
+        return httpx.Response(200, json=openai_response(json.dumps(PAYLOAD)))
+
+    provider = make_provider(handler)
+    reply = provider.complete_json("sys", "user", MUTANT_SCHEMA)
+
+    assert len(calls) == 2
+    assert len(sleeps) == 1
+    assert reply.data == PAYLOAD
+
+
+def test_transient_429_exhausts_retries_and_raises():
+    monkeypatch_calls = []
+
+    def handler(request):
+        monkeypatch_calls.append(1)
+        return httpx.Response(429, json={"error": {"message": "rate limited"}})
+
+    provider = make_provider(handler)
+    provider._backoff_seconds = lambda attempt, retry_after: 0  # no real sleeping
+    with pytest.raises(ProviderError, match="OpenRouter request failed"):
+        provider.complete_json("sys", "user", MUTANT_SCHEMA)
+
+    # Initial attempt + 2 retries = 3 total requests, then it gives up.
+    assert len(monkeypatch_calls) == 3
+
+
+def test_non_retryable_400_fails_immediately_without_retry(monkeypatch):
+    def boom_sleep(_seconds):  # pragma: no cover - must never be called
+        raise AssertionError("a bad request must not trigger a backoff sleep")
+
+    monkeypatch.setattr("mutagen_cli.provider.time.sleep", boom_sleep)
+
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(400, json={"error": {"message": "bad request"}})
+
+    provider = make_provider(handler)
+    with pytest.raises(ProviderError, match="OpenRouter request failed"):
+        provider.complete_json("sys", "user", MUTANT_SCHEMA)
+
+    # One attempt with structured output, one fallback attempt without it —
+    # both 400, neither retried.
+    assert len(calls) == 2
+
+
+def test_connect_error_is_retried_then_succeeds(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr("mutagen_cli.provider.time.sleep", lambda s: sleeps.append(s))
+
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            raise httpx.ConnectError("connection refused", request=request)
+        return httpx.Response(200, json=openai_response(json.dumps(PAYLOAD)))
+
+    provider = make_provider(handler)
+    reply = provider.complete_json("sys", "user", MUTANT_SCHEMA)
+
+    assert len(calls) == 2
+    assert len(sleeps) == 1
+    assert reply.data == PAYLOAD
+
+
+def test_retry_after_header_is_respected_and_capped(monkeypatch):
+    seen_delays = []
+    monkeypatch.setattr(
+        "mutagen_cli.provider.time.sleep", lambda s: seen_delays.append(s)
+    )
+
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(
+                429, headers={"retry-after": "9999"},
+                json={"error": {"message": "rate limited"}},
+            )
+        return httpx.Response(200, json=openai_response(json.dumps(PAYLOAD)))
+
+    provider = make_provider(handler)
+    provider.complete_json("sys", "user", MUTANT_SCHEMA)
+
+    assert seen_delays == [30.0]
+
+
 def test_resolve_api_key_prefers_env_then_config(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-env")
     assert resolve_api_key("openrouter", tmp_path) == "sk-or-env"
