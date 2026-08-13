@@ -14,13 +14,42 @@ from typing import Optional
 
 CACHE_VERSION = "1"
 
+_GITIGNORE_ENTRY = ".mutagen/"
+
+
+def _ensure_gitignored(root: Path) -> None:
+    """.mutagen/cache holds raw prompts and replies — i.e. the user's own
+    code — so an un-gitignored .mutagen/ is one `git add -A` away from
+    getting committed. Only touches the file on first creation of .mutagen/,
+    and only appends; existing content is never altered."""
+    gitignore = Path(root) / ".gitignore"
+    try:
+        existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+        if any(
+            line.strip() in (_GITIGNORE_ENTRY, ".mutagen")
+            for line in existing.splitlines()
+        ):
+            return
+        separator = "" if not existing or existing.endswith("\n") else "\n"
+        addition = (
+            f"{separator}# mutagen-cli: raw LLM prompts/replies (your code) — don't commit\n"
+            f"{_GITIGNORE_ENTRY}\n"
+        )
+        gitignore.write_text(existing + addition, encoding="utf-8")
+    except OSError:
+        pass  # best-effort hygiene, never fatal to the run
+
 
 class Cache:
     def __init__(self, root: Path, enabled: bool = True):
-        self.dir = Path(root) / ".mutagen" / "cache"
+        root = Path(root)
+        self.dir = root / ".mutagen" / "cache"
         self.enabled = enabled
         if self.enabled:
+            first_creation = not (root / ".mutagen").exists()
             self.dir.mkdir(parents=True, exist_ok=True)
+            if first_creation:
+                _ensure_gitignored(root)
 
     @staticmethod
     def key(*parts: str) -> str:
