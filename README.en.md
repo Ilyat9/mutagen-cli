@@ -61,8 +61,11 @@ working tree itself is never touched except by `--invent-apply`; and it's not
 a coverage tool — a high score on the functions you changed says nothing
 about the ones you didn't.
 
-Full docs, provider setup, CI/GitHub Action, flags, and benchmarks: see the
-[Russian README](README.md) — it's the maintained one.
+Full docs, provider setup, CI/GitHub Action, flags, benchmarks, and the
+project's origin story (two separate bugs in the tool itself, caught by hand,
+along the way): see the
+[Russian README](README.md#история-проекта-от-идеи-до-готового-инструмента) —
+it's the maintained one.
 
 ## License
 
