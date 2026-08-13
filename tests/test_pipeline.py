@@ -208,6 +208,41 @@ def test_mutation_lands_in_the_target_function_not_a_twin(victim_repo, tmp_path)
     assert changed_line > 4, f"mutation landed in alpha, not beta:\n{diff}"
 
 
+DUPLICATE_LINE_MODULE = '''\
+def clamp_or_zero(a, b):
+    if a < 0:
+        return 0
+    if b < 0:
+        return 0
+    return a + b
+'''
+DUPLICATE_LINE_MUTANT = {
+    "description": "negative guard returns -1 instead of 0",
+    "bug_category": "wrong_operator",
+    "search_block": "        return 0",
+    "replace_block": "        return -1",
+}
+
+
+def test_multiple_exact_matches_within_span_is_flagged_in_the_report(victim_repo, tmp_path):
+    # "        return 0" occurs twice inside clamp_or_zero's own span. apply.py
+    # silently takes the first hit rather than refusing — the model broke its
+    # own "match exactly once" rule, and the report must say so.
+    (victim_repo / "victim" / "dupe.py").write_text(DUPLICATE_LINE_MODULE)
+    (victim_repo / "tests" / "test_dupe.py").write_text(
+        "from victim.dupe import clamp_or_zero\n\n\n"
+        "def test_clamp_or_zero_adds():\n    assert clamp_or_zero(1, 2) == 3\n"
+    )
+    mutants = build(victim_repo, {"clamp_or_zero": [DUPLICATE_LINE_MUTANT]})
+    assert len(mutants) == 1
+    results = execute(config(victim_repo), mutants, [sandbox(victim_repo, tmp_path)])
+
+    assert len(results) == 1
+    assert results[0].verdict != UNAPPLICABLE, results[0].detail
+    assert "2 matches" in results[0].detail
+    assert "used first" in results[0].detail
+
+
 def test_the_working_tree_is_never_modified(victim_repo, tmp_path):
     before = (victim_repo / "victim" / "pricing.py").read_text()
     mutants = build(victim_repo, {"apply_discount": [CAP_BECOMES_FLOOR]})

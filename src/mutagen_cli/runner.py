@@ -274,6 +274,12 @@ def execute(
                 _record(Result(mutant, UNAPPLICABLE, detail=applied.reason))
                 continue
 
+            # The model was told to match exactly once; when the search block
+            # is not unique within the function, apply.py silently takes the
+            # first hit. That's a real risk of mutating the wrong occurrence,
+            # so it must survive into the report, not get discarded here.
+            match_note = applied.method if applied.method.startswith("exact (") else ""
+
             diff = make_diff(rel, original, applied.text)
 
             # Which tests actually reach the lines this mutation changed?
@@ -284,11 +290,14 @@ def execute(
                     # Nothing executes these lines, so no test outcome can
                     # depend on them. Running the suite to watch it pass would
                     # only cost time and prove what the map already states.
+                    detail = "no test executes the mutated lines"
+                    if match_note:
+                        detail = f"[{match_note}] {detail}"
                     _record(
                         Result(
                             mutant,
                             SURVIVED,
-                            detail="no test executes the mutated lines",
+                            detail=detail,
                             diff=diff,
                             no_coverage=True,
                         )
@@ -312,6 +321,8 @@ def execute(
                 detail = f"no result within {cfg.timeout:.0f}s (probable infinite loop)"
             elif verdict == ERROR:
                 detail = f"pytest exit {code}: {summarize_failures(output)}"
+            if match_note:
+                detail = f"[{match_note}] {detail}".strip()
             _record(Result(mutant, verdict, detail=detail, diff=diff, duration=duration))
 
     def _record(result: Result) -> None:
