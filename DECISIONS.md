@@ -29,7 +29,7 @@ and the CLI verb is what people actually type. The caveat is real though: if a
 user has the audio library installed, `import mutagen` in their code and our
 `mutagen` binary coexist fine, but the two names in one requirements file will
 confuse people. If you want zero ambiguity, pick a fresh name now — renaming
-after the article ships is much worse.
+later is much worse.
 
 ## D2 — Default model is `claude-opus-5`
 
@@ -45,8 +45,8 @@ overridable with `--model` / `--effort`.
 emits equivalent mutants produces a noisy report, which is the failure mode we
 are specifically trying to avoid. The disk cache makes iteration free, and
 `--dry-run` shows the call count before spending anything. But this is your
-money: if the article's headline is "costs pennies", switch the default to
-Sonnet and quote both in BENCHMARKS.md.
+money: if "costs pennies" matters more than mutant quality, switch the default
+to Sonnet and quote both in BENCHMARKS.md.
 
 **Update 2026-08-13.** Superseded by D8: the default *provider* is now
 OpenRouter, and its default model is `anthropic/claude-sonnet-5` ($2/$10).
