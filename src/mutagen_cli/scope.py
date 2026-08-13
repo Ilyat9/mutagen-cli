@@ -66,6 +66,34 @@ def is_mutable_source(rel: str) -> bool:
     return rel.endswith(".py") and not is_skipped(rel) and not is_test_file(rel)
 
 
+def default_base_branch(root: Path) -> str:
+    """Guess the repository's default branch, without assuming it's "main".
+
+    Tries the remote's advertised HEAD first (accurate whenever the repo was
+    cloned normally), then falls back to whichever of main/master exists
+    locally. Raises ScopeError with a pointer to --base if neither works —
+    e.g. a shallow clone or a fetch that never ran `git remote set-head`.
+    """
+    try:
+        out = run_git(["symbolic-ref", "refs/remotes/origin/HEAD"], root).strip()
+        if out:
+            return out.rsplit("/", 1)[-1]
+    except ScopeError:
+        pass
+
+    for candidate in ("main", "master"):
+        try:
+            run_git(["show-ref", "--verify", "--quiet", f"refs/heads/{candidate}"], root)
+            return candidate
+        except ScopeError:
+            continue
+
+    raise ScopeError(
+        "could not determine the default branch (no origin/HEAD and no local "
+        "main or master). Pass it explicitly with --base <branch>."
+    )
+
+
 def _resolve_base(root: Path, base: str) -> str:
     """Prefer the merge base so we diff against the fork point, not the tip."""
     try:

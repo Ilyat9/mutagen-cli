@@ -43,7 +43,7 @@ from .runner import (
     execute,
     prepare_workspace,
 )
-from .scope import ScopeError, collect_targets, map_tests, repo_root
+from .scope import ScopeError, collect_targets, default_base_branch, map_tests, repo_root
 
 console = Console()
 
@@ -69,8 +69,9 @@ def main() -> None:
 
 
 @main.command()
-@click.option("--base", default="main", show_default=True,
-              help="Git ref to diff against when picking what to mutate.")
+@click.option("--base", default=None,
+              help="Git ref to diff against when picking what to mutate. "
+                   "Default: the repository's default branch, auto-detected.")
 @click.option("--all", "all_files", is_flag=True, help="Mutate the whole codebase.")
 @click.option("--path", "paths", multiple=True, type=click.Path(exists=True),
               help="Mutate specific files or directories. Repeatable.")
@@ -114,6 +115,12 @@ def run(
         root = repo_root(Path.cwd())
     except ScopeError as exc:
         fail(str(exc))
+
+    if base is None and not all_files and not paths:
+        try:
+            base = default_base_branch(root)
+        except ScopeError as exc:
+            fail(str(exc))
 
     # --- what to mutate -------------------------------------------------------
     try:

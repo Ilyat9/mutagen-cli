@@ -4,8 +4,10 @@ import sys
 import pytest
 
 from mutagen_cli.scope import (
+    ScopeError,
     changed_line_ranges,
     collect_targets,
+    default_base_branch,
     functions_in_file,
     is_mutable_source,
     is_test_file,
@@ -68,6 +70,46 @@ def test_repo_root_resolves_a_symlinked_path(victim_repo, tmp_path):
         repo_root(link), paths=[str(link / "victim" / "cache.py")]
     )
     assert targets
+
+
+def test_default_base_branch_falls_back_to_local_main(victim_repo):
+    assert default_base_branch(victim_repo) == "main"
+
+
+def test_default_base_branch_falls_back_to_local_master(victim_repo):
+    subprocess.run(
+        ["git", "branch", "-m", "main", "master"], cwd=victim_repo, check=True
+    )
+    assert default_base_branch(victim_repo) == "master"
+
+
+def test_default_base_branch_prefers_origin_head(victim_repo, tmp_path):
+    subprocess.run(
+        ["git", "checkout", "-q", "-b", "develop"], cwd=victim_repo, check=True
+    )
+    subprocess.run(["git", "branch", "-D", "main"], cwd=victim_repo, check=True)
+
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(bare)], cwd=victim_repo, check=True
+    )
+    subprocess.run(
+        ["git", "push", "-q", "origin", "develop"], cwd=victim_repo, check=True
+    )
+    subprocess.run(
+        ["git", "remote", "set-head", "origin", "develop"], cwd=victim_repo, check=True
+    )
+
+    assert default_base_branch(victim_repo) == "develop"
+
+
+def test_default_base_branch_errors_with_no_candidate(victim_repo):
+    subprocess.run(
+        ["git", "branch", "-m", "main", "trunk"], cwd=victim_repo, check=True
+    )
+    with pytest.raises(ScopeError, match="--base"):
+        default_base_branch(victim_repo)
 
 
 def test_uncommitted_edits_are_in_scope(victim_repo):
