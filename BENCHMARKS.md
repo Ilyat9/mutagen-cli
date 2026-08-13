@@ -277,7 +277,7 @@ without `.venv`/`.mutagen`/caches, new virtualenv, `pip install -e ".[dev]"`).
 | `ruff check .` | clean |
 | Run A reproduced | **28 mutants, 12/16, 42.9%, 28/28 golden verdicts** — identical |
 | Run B reproduced (`--replies live_replies.json`) | **43 mutants, 8/35, 18.6%, 0% unapplicable** — identical |
-| `mutagen run --all --dry-run` on mutagen itself | 90 functions in 13 files, plan printed, nothing spent |
+| `mutagen run --all --dry-run` on mutagen itself | 94 functions in 13 files, plan printed, 9 calls quoted, nothing spent |
 | Live mini-run, OpenRouter, `--max-mutants 5` | 5 mutants, 0% unapplicable, 2 calls, **$0.014**, 14.7 s |
 | 3 hand-written must-die mutants through the CLI | all 3 `killed`, each naming its own failing test |
 | Live `--invent` on `victim/pricing.py` | 3 mutants, 2 `verified` suggested tests, 3 calls, **$0.016**, 33.1 s |
