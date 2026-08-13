@@ -82,7 +82,10 @@ def invent(
         if not code.strip():
             continue
 
-        rel = f"{GENERATED_DIR}/test_{_slug(mutant.target.qualname)}_{mutant.index}.py"
+        # mutant.id (sha1-based) rather than .index: the index is only
+        # per-call, so two different mutants sharing a qualname could
+        # otherwise collide on the same generated filename.
+        rel = f"{GENERATED_DIR}/test_{_slug(mutant.id)}.py"
         status = _verify(cfg, workdir, mutant, rel, code)
 
         result.invented_test = code
