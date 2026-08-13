@@ -95,6 +95,14 @@ def run_pytest(
         env["COVERAGE_FILE"] = str(workdir / coverage_map.DATA_FILE)
         env["COVERAGE_CORE"] = coverage_map.COVERAGE_CORE
 
+    # So a runaway mutant's children die with it: a new session on POSIX
+    # (killpg reaches the whole group), a new process group on Windows
+    # (taskkill /T reaches the whole tree).
+    group_kwargs = (
+        {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        if os.name == "nt"
+        else {"start_new_session": True}
+    )
     started = time.monotonic()
     proc = subprocess.Popen(
         cmd,
@@ -104,16 +112,22 @@ def run_pytest(
         text=True,
         errors="replace",
         env=env,
-        start_new_session=True,  # so a runaway mutant's children die with it
+        **group_kwargs,
     )
     try:
         output, _ = proc.communicate(timeout=timeout)
         code = proc.returncode
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            proc.kill()
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+            )
+        else:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
         output, _ = proc.communicate()
         code = -1
     return code, output or "", time.monotonic() - started
