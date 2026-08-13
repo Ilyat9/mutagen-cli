@@ -49,7 +49,7 @@ console = Console()
 
 
 def fail(message: str, code: int = 2) -> None:
-    console.print(Text(f"error: {message}", style="bold red"))
+    console.print(Text(f"error: {message}", style="bold red"), soft_wrap=True)
     raise SystemExit(code)
 
 
