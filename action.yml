@@ -59,11 +59,18 @@ outputs:
 runs:
   using: composite
   steps:
+    # Trigger this action from `pull_request`, as in the README's usage
+    # example, never from `pull_request_target` with a checkout of the PR's
+    # code — that combination hands a fork PR's untrusted code your
+    # repository secrets (pwn request). On fork PRs, also turn on required
+    # approval for first-time contributors (Settings > Actions > General).
+    #
     # Note: mutagen strips OPENROUTER_API_KEY, ANTHROPIC_API_KEY and
     # GITHUB_TOKEN from the environment of every pytest subprocess it spawns,
-    # so a test from an untrusted pull request cannot read or leak them. On a
-    # fork PR still turn on "required approval for first-time contributors"
-    # (Settings > Actions > General), as for any CI job that runs a PR's code.
+    # so a test from an untrusted pull request cannot read or leak them. This
+    # protects against a malicious test in the suite, not against
+    # pull_request_target — the trigger choice above is what protects against
+    # that.
     - name: Install mutagen
       shell: bash
       # Pinned so the mutation gate is reproducible across runs and cannot
@@ -94,7 +101,11 @@ runs:
         if [ -z "$base" ]; then
           base="origin/$PR_BASE_REF"
         fi
-        git fetch --quiet origin "$PR_BASE_REF" --depth=200 || true
+        # Full fetch, not a shallow one: a shallow fetch can miss the merge
+        # base on a branch with many commits since it diverged, and the
+        # scope would then silently degrade instead of failing loudly.
+        # Matches the fetch-depth: 0 checkout in the README example.
+        git fetch --quiet origin "$PR_BASE_REF" || true
 
         args=(run --base "$base"
               --max-mutants "$INPUT_MAX_MUTANTS"
