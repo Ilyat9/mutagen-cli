@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from .models import ERROR, KILLED, SURVIVED, TIMEOUT, UNAPPLICABLE, Result, Usage
+from .provider import PRICES_DATE
 
 
 @dataclass
@@ -188,6 +189,14 @@ def _fmt_cost(usage: Usage, model: str) -> str:
     return f"~${usage.cost_usd:.3f}"
 
 
+def _fmt_cost_markdown(usage: Usage, model: str) -> str:
+    """Like `_fmt_cost`, but names the price table's as-of date — the built-in
+    prices go stale, and a bare dollar figure hides that."""
+    if usage.unpriced_calls:
+        return _fmt_cost(usage, model)
+    return f"{_fmt_cost(usage, model)} (prices as of {PRICES_DATE})"
+
+
 def _render_footer(
     console: Console, summary: Summary, usage: Usage, model: str, mapping: str
 ) -> None:
@@ -328,7 +337,7 @@ def render_markdown(
     out.append("---\n")
     out.append(
         f"{tallies}. {usage.calls} LLM calls ({usage.cached_calls} cached{failed}) with "
-        f"`{model}`, {_fmt_cost(usage, model)}, {summary.duration:.1f}s.{note}\n"
+        f"`{model}`, {_fmt_cost_markdown(usage, model)}, {summary.duration:.1f}s.{note}\n"
     )
     return "\n".join(out)
 
