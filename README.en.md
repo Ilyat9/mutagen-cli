@@ -75,9 +75,13 @@ audio-metadata library; the command installed is `mutagen`.) To work on
 mutagen-cli itself instead: `git clone https://github.com/Ilyat9/mutagen-cli
 && cd mutagen-cli && pip install -e ".[dev]"`.
 
-No config file. `mutagen run` diffs your working tree against `main`, mutates
-only the functions you changed, and runs only the tests that actually cover
-them. `--provider anthropic` talks to Anthropic directly instead of
+No config file. `mutagen run` diffs your working tree against the
+repository's default branch (auto-detected from `origin/HEAD`, falling back
+to a local `main`/`master`), mutates only the functions you changed, and
+runs only the tests that actually cover them. If your default branch is
+something else (`develop`, `trunk`, ...) and auto-detection doesn't find it,
+say so explicitly: `mutagen run --base master` (or whatever your branch is
+called). `--provider anthropic` talks to Anthropic directly instead of
 OpenRouter — that path is less battle-tested than OpenRouter (all our live
 runs so far went through OpenRouter); file an issue if you hit trouble there.
 
