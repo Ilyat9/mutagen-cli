@@ -70,8 +70,13 @@ def generate(
     usage = Usage()
     warnings: list[str] = []
 
-    for target in targets:
+    for processed, target in enumerate(targets):
         if len(mutants) >= max_mutants:
+            remaining = len(targets) - processed
+            warnings.append(
+                f"--max-mutants: {remaining} function(s) were not mutated because "
+                f"the limit ({max_mutants}) was reached first"
+            )
             break
         tests_source = read_test_context(root, target)
         try:

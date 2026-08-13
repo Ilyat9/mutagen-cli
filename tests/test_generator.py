@@ -114,6 +114,19 @@ def test_generate_honours_max_mutants(victim_repo):
     assert len(mutants) == 3
 
 
+def test_generate_warns_when_max_mutants_skips_whole_functions(victim_repo):
+    # Two targets, a budget that's exhausted entirely by the first: the
+    # second is never even called, and that should be visible, not silent.
+    targets = [t for t in collect_targets(victim_repo, all_files=True)
+               if t.qualname in ("apply_discount", "paginate")]
+    many = [dict(MUTANT, replace_block=f"        discount = {i}") for i in range(3)]
+    mutants, _, warnings = generate(
+        victim_repo, targets, ReplayProvider([reply(*many)]), "m", max_mutants=3
+    )
+    assert len(mutants) == 3
+    assert any("--max-mutants" in w and "1 function" in w for w in warnings)
+
+
 def test_test_context_includes_mapped_files(victim_repo):
     targets = collect_targets(victim_repo, all_files=True)
     map_tests(victim_repo, targets)
