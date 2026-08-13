@@ -4,7 +4,9 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-08-13
+
+Published to PyPI: <https://pypi.org/project/mutagen-cli/0.1.0/>.
 
 ### The tool
 

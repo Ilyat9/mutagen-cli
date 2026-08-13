@@ -20,11 +20,9 @@ console script `mutagen`. Users type `pip install mutagen-cli` then `mutagen run
 **B.** Rename the project outright — `mutant`, `greenlie`, `nullhypothesis`,
 `does-it-catch`. Keeps one name everywhere.
 
-**Status 2026-08-13.** Re-checked at audit time: `mutagen-cli` is still 404 on
-PyPI, so the name is available — but **nothing has been published yet**. Until
-it is, `pip install mutagen-cli` does not work, and the README says so and
-tells people to install from source instead. Publish before the article ships,
-or the first command a reader types fails.
+**Status 2026-08-13.** Published: `mutagen-cli` 0.1.0 is live on PyPI —
+<https://pypi.org/project/mutagen-cli/0.1.0/>. `pip install mutagen-cli` then
+`mutagen run` is now the documented quickstart everywhere (README, `action.yml`).
 
 **Recommendation: A, with a caveat.** The split name is normal (`ripgrep`/`rg`)
 and the CLI verb is what people actually type. The caveat is real though: if a

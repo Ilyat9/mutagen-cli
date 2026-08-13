@@ -36,14 +36,16 @@ shape of blind spot each time.
 
 ## Quickstart
 
-Not on PyPI yet — install from source (`mutagen-cli` is the reserved
-distribution name; the command is `mutagen`).
-
 ```bash
-git clone https://github.com/Ilyat9/mutagen-cli && cd mutagen-cli && pip install -e .
+pip install mutagen-cli
 export OPENROUTER_API_KEY=sk-or-...
 mutagen run
 ```
+
+(`mutagen-cli` is the distribution name — `mutagen` itself is the
+audio-metadata library; the command installed is `mutagen`.) To work on
+mutagen-cli itself instead: `git clone https://github.com/Ilyat9/mutagen-cli
+&& cd mutagen-cli && pip install -e ".[dev]"`.
 
 No config file. `mutagen run` diffs your working tree against `main`, mutates
 only the functions you changed, and runs only the tests that actually cover

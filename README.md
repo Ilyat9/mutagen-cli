@@ -65,12 +65,8 @@ happy path систематически не видят.
 
 ## Быстрый старт
 
-Пока не в PyPI — ставится из исходников. Имя дистрибутива зарезервировано как
-`mutagen-cli` (`mutagen` — это библиотека для аудио-метаданных), команда —
-`mutagen`.
-
 ```bash
-git clone https://github.com/Ilyat9/mutagen-cli && cd mutagen-cli && pip install -e .
+pip install mutagen-cli
 ```
 
 ```bash
@@ -80,6 +76,11 @@ export OPENROUTER_API_KEY=sk-or-...
 ```bash
 mutagen run
 ```
+
+(`mutagen-cli` — имя дистрибутива, `mutagen` сам по себе — библиотека для
+аудио-метаданных; устанавливаемая команда называется `mutagen`.) Чтобы
+разрабатывать сам mutagen-cli — `git clone
+https://github.com/Ilyat9/mutagen-cli && cd mutagen-cli && pip install -e ".[dev]"`.
 
 Готово. Никакого конфига. `mutagen run` сравнивает рабочее дерево с `main`,
 мутирует только изменённые функции и гоняет только те тесты, которые их

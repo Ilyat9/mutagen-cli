@@ -61,11 +61,7 @@ runs:
   steps:
     - name: Install mutagen
       shell: bash
-      # Installed from the action's own checkout rather than PyPI: the package
-      # is not published yet, and this pins mutagen to the same ref the workflow
-      # already picked with `uses: Ilyat9/mutagen-cli@<ref>`. Switch to
-      # `pip install mutagen-cli` once the package is on PyPI.
-      run: pip install --quiet "${{ github.action_path }}"
+      run: pip install --quiet mutagen-cli
 
     - name: Run mutagen
       id: mutate
