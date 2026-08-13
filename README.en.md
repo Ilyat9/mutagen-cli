@@ -63,6 +63,13 @@ export OPENROUTER_API_KEY=sk-or-...
 mutagen run
 ```
 
+Works off the functions you changed — on a clean tree with no diff against
+`main` there is nothing to compare against. For a first look on a clean tree:
+
+```bash
+mutagen run --all --max-mutants 5
+```
+
 (`mutagen-cli` is the distribution name — `mutagen` itself is the
 audio-metadata library; the command installed is `mutagen`.) To work on
 mutagen-cli itself instead: `git clone https://github.com/Ilyat9/mutagen-cli
@@ -71,18 +78,47 @@ mutagen-cli itself instead: `git clone https://github.com/Ilyat9/mutagen-cli
 No config file. `mutagen run` diffs your working tree against `main`, mutates
 only the functions you changed, and runs only the tests that actually cover
 them. `--provider anthropic` talks to Anthropic directly instead of
-OpenRouter.
+OpenRouter — that path is less battle-tested than OpenRouter (all our live
+runs so far went through OpenRouter); file an issue if you hit trouble there.
 
 ## Limitations
 
-Python/pytest only; cost is real (one LLM call per changed function, more
-with `--invent`, though the disk cache makes reruns cheap); equivalent
-mutants still slip through so a survivor is a lead, not a proof; precise test
-mapping needs `pytest-cov`, otherwise it falls back to a filename heuristic
-and says so; each worker copies your repo, so very large repos feel it; your
-working tree itself is never touched except by `--invent-apply`; and it's not
-a coverage tool — a high score on the functions you changed says nothing
-about the ones you didn't.
+- **Python and pytest only.** Other languages and runners are not supported.
+- **Cost is real.** One LLM call per changed function, plus one more per
+  survivor under `--invent`. The disk cache makes reruns cheap, but the first
+  run on a large diff won't be free. `--dry-run` shows the call count upfront.
+- **Equivalent mutants still slip through.** The prompt actively forbids
+  mutations that don't change behavior, and most survivors are real bugs, but
+  not all. A "survivor" is a lead to check, not a proven gap.
+- **Precise test mapping needs `pytest-cov`** in the interpreter that runs
+  your tests. With it, mutagen-cli measures which tests execute which lines.
+  Without it, mutagen-cli falls back to a filename/symbol heuristic and says
+  so in the report; a heuristic that guesses the wrong files reports mutants
+  as survivors even though the test that would have killed them just never ran.
+- **Each worker copies the repository** into a temp directory. Large repos
+  with large untracked directories will feel it.
+- **Your working tree is never touched** — except by `--invent-apply`, which
+  writes new files to `tests/mutagen_generated/` and nowhere else.
+- **This is not a coverage tool.** A high mutation score on the functions you
+  changed says nothing about the functions you didn't touch.
+- **Report text is LLM-generated from your code, including untrusted code.**
+  Each mutant's description and other report text is written by the model
+  from the function's source (and, under `--invent`, its tests) — which may
+  be code from someone else's PR. That text is posted into the markdown/JSON
+  report and the PR comment as-is, with no extra sanitization. A comment or
+  docstring in the PR crafted to look like an instruction to the model
+  (prompt injection) could in principle influence the wording in the report.
+  Keep that in mind when the Action runs on third-party PRs: the report is
+  text generated from untrusted input, not a statement from your CI system.
+- **Projects whose package only imports from site-packages** (e.g. with
+  C extensions built at install time) aren't a fit yet: mutagen-cli puts the
+  worker copy's sources ahead on `PYTHONPATH`, and the copy has no compiled
+  modules — the baseline fails with `ImportError`.
+- **The secret strip-list for pytest subprocesses is fixed** —
+  `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`. Other
+  environment tokens (`AWS_*`, `NPM_TOKEN`, etc.) are visible to pytest
+  subprocesses; don't run this on untrusted code with such variables in the
+  environment.
 
 Full docs, provider setup, CI/GitHub Action, flags, benchmarks, and the
 project's origin story (two separate bugs in the tool itself, caught by hand,
