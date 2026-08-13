@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mutagen/
+mutagen-report.md
+mutagen-report.json
+.DS_Store
+.env
+*.env
+
+# Output of running mutagen on other projects. These contain the *source code
+# of the analysed repo* inside the LLM cache and the report diffs — never
+# commit them.
+reports/
+mutagen-cache/
+
+# Regenerable benchmark artefacts. `live_replies.json`, `live_sonnet5.*`,
+# `live_opus5.*` and `benchmark_live.log` are deliberately NOT ignored — they
+# are the evidence behind BENCHMARKS.md Runs B, C and D.
+prompts/
+live_report.json

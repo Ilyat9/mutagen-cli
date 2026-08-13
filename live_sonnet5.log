@@ -1,0 +1,847 @@
+
+15 function(s) in 5 file(s) → up to 40 mutants, 15 LLM call(s) with 
+anthropic/claude-sonnet-5
+
+
+
+
+╭──────────────────────────────────────────────────────╮
+│ mutation score  22%   (9 killed / 40 viable mutants) │
+╰──────────────────────────────────────────────────────╯
+
+file                  killed  survived  score
+victim/cache.py            4        13    24%
+victim/pagination.py       3         9    25%
+victim/parsing.py          0         6     0%
+victim/pricing.py          0         3     0%
+victim/text.py             2         -   100%
+
+31 bugs your tests would not catch
+
+╭───────────────────────────────── survivor 1 ─────────────────────────────────╮
+│ The default capacity boundary check allows capacity of 0 to silently pass    │
+│ validation logic when capacity is set below 1 via a boundary flip, causing   │
+│ an off-by-one on the minimum allowed capacity so capacity=1 is wrongly       │
+│ rejected.                                                                    │
+│ victim/cache.py::LRUCache.__init__   [boundary_condition]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -10,5 +10,5 @@
+ 
+     def __init__(self, capacity=128):
+-        if capacity < 1:
++        if capacity < 2:
+             raise ValueError("capacity must be >= 1")
+         self.capacity = capacity
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_capacity_one_is_valid():
+    cache = LRUCache(capacity=1)
+    cache.set("a", 1)
+    assert cache.get("a") == 1
+
+
+╭───────────────────────────────── survivor 2 ─────────────────────────────────╮
+│ Hit and miss counters start at 1 instead of 0, so freshly created caches     │
+│ report inflated hit/miss statistics before any access occurs.                │
+│ victim/cache.py::LRUCache.__init__   [wrong_default]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -14,6 +14,6 @@
+         self.capacity = capacity
+         self._data = OrderedDict()
+-        self.hits = 0
+-        self.misses = 0
++        self.hits = 1
++        self.misses = 1
+ 
+     def __len__(self):
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_fresh_cache_has_zero_hit_and_miss_counters():
+    cache = LRUCache(capacity=4)
+    assert cache.hits == 0
+    assert cache.misses == 0
+
+
+╭───────────────────────────────── survivor 3 ─────────────────────────────────╮
+│ The default capacity is silently changed from 128 to 1, so caches created    │
+│ without an explicit capacity evict everything after the very first insert.   │
+│ victim/cache.py::LRUCache.__init__   [wrong_default]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -9,5 +9,5 @@
+     """Least-recently-used cache bounded by ``capacity`` entries."""
+ 
+-    def __init__(self, capacity=128):
++    def __init__(self, capacity=1):
+         if capacity < 1:
+             raise ValueError("capacity must be >= 1")
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_default_capacity_is_128():
+    cache = LRUCache()
+    for i in range(128):
+        cache.set(f"key{i}", i)
+    assert cache.get("key0") == 0
+    assert cache.get("key127") == 127
+
+
+╭──────────────────────────────── survivor 4 ─────────────────────────────────╮
+│ len(cache) always returns one less than the actual number of entries stored │
+│ victim/cache.py::LRUCache.__len__   [off_by_one]                            │
+╰─────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return len(self._data) - 1
+ 
+     def get(self, key, default=None):
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_len_returns_exact_count():
+    cache = LRUCache(capacity=4)
+    cache.set("a", 1)
+    cache.set("b", 2)
+    assert len(cache) == 2
+
+
+╭────────────────────────────── survivor 5 ──────────────────────────────╮
+│ len(cache) always returns zero regardless of how many items are stored │
+│ victim/cache.py::LRUCache.__len__   [wrong_default]                    │
+╰────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return 0
+ 
+     def get(self, key, default=None):
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_len_returns_correct_count():
+    cache = LRUCache(capacity=4)
+    cache.set("a", 1)
+    cache.set("b", 2)
+    assert len(cache) == 2
+
+
+╭───────────────────────────────── survivor 6 ─────────────────────────────────╮
+│ Reading a value from the cache no longer refreshes its recency, so           │
+│ recently-accessed items can still be evicted before less-recently-used ones. │
+│ victim/cache.py::LRUCache.get   [state_leak]                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -26,5 +26,4 @@
+             return default
+         self.hits += 1
+-        self._data.move_to_end(key)
+         return self._data[key]
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_lru_ordering_refreshes_on_get_strict():
+    cache = LRUCache(capacity=2)
+    cache.set("a", 1)
+    cache.set("b", 2)
+    cache.get("a")
+    cache.set("c", 3)
+    assert cache.get("a") == 1
+    assert cache.get("b") is None
+
+
+╭───────────────────────────────── survivor 7 ─────────────────────────────────╮
+│ Every cache lookup, hit or miss, is counted as a hit, so hit/miss statistics │
+│ become meaningless.                                                          │
+│ victim/cache.py::LRUCache.get   [wrong_operator]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -22,8 +22,8 @@
+     def get(self, key, default=None):
+         """Return the cached value, refreshing its recency."""
++        self.hits += 1
+         if key not in self._data:
+             self.misses += 1
+             return default
+-        self.hits += 1
+         self._data.move_to_end(key)
+         return self._data[key]
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_hit_miss_counts_are_accurate():
+    cache = LRUCache(capacity=4)
+    cache.set("a", 1)
+    cache.get("a")       # hit
+    cache.get("missing")  # miss
+    assert cache.hits == 1
+    assert cache.misses == 1
+
+
+╭───────────────────────────────── survivor 8 ─────────────────────────────────╮
+│ Setting a value for a key that already exists no longer refreshes its        │
+│ recency, so it can be evicted as if it were the oldest entry even though it  │
+│ was just updated.                                                            │
+│ victim/cache.py::LRUCache.set   [missing_invalidation]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -31,6 +31,4 @@
+     def set(self, key, value):
+         """Store ``value``, evicting the least-recently-used entry if full."""
+-        if key in self._data:
+-            self._data.move_to_end(key)
+         self._data[key] = value
+         if len(self._data) > self.capacity:
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_set_existing_key_refreshes_recency():
+    cache = LRUCache(capacity=2)
+    cache.set("a", 1)
+    cache.set("b", 2)
+    # Re-setting "a" should mark it as most-recently-used.
+    cache.set("a", 10)
+    # Adding a new key should evict "b", not "a", since "a" was just refreshed.
+    cache.set("c", 3)
+    assert cache.get("a") == 10
+    assert cache.get("b") is None
+    assert cache.get("c") == 3
+
+
+╭───────────────────────────────── survivor 9 ─────────────────────────────────╮
+│ invalidate() reports success even when the key was never present, since it   │
+│ always returns True regardless of whether a deletion happened                │
+│ victim/cache.py::LRUCache.invalidate   [wrong_operator]                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -41,6 +41,5 @@
+         if key in self._data:
+             del self._data[key]
+-            return True
+-        return False
++        return True
+ 
+     def invalidate_prefix(self, prefix):
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_invalidate_missing_key_returns_false():
+    cache = LRUCache(capacity=4)
+    assert cache.invalidate("nonexistent") is False
+
+
+╭──────────────────────────────── survivor 10 ─────────────────────────────────╮
+│ invalidate() removes the key from storage but leaves it in the LRU order     │
+│ tracking, so stale key references can linger and affect eviction ordering    │
+│ victim/cache.py::LRUCache.invalidate   [state_leak]                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -40,5 +40,5 @@
+         """Drop a single key. Returns True if something was removed."""
+         if key in self._data:
+-            del self._data[key]
++            self._data.pop(key)
+             return True
+         return False
+suggested test — passes on your code but does not catch this mutant
+from victim.cache import LRUCache
+
+
+def test_invalidate_does_not_leave_stale_lru_entry_affecting_eviction():
+    cache = LRUCache(capacity=2)
+    cache.set("a", 1)
+    cache.set("b", 2)
+    cache.invalidate("a")
+    cache.set("c", 3)
+    cache.set("d", 4)
+    # capacity is 2, so only c and d should remain; a's stale order entry
+    # must not cause b to be evicted before it should, nor keep a's ghost
+    # entry alive in the eviction order.
+    assert cache.get("b") is None
+    assert cache.get("c") == 3
+    assert cache.get("d") == 4
+    assert len(cache) == 2
+
+
+╭──────────────────────────────── survivor 11 ─────────────────────────────────╮
+│ invalidate_prefix always reports zero removals regardless of how many keys   │
+│ were actually deleted, so callers relying on the count get wrong information │
+│ victim/cache.py::LRUCache.invalidate_prefix   [wrong_default]                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -49,4 +49,4 @@
+         for key in doomed:
+             del self._data[key]
+-        return len(doomed)
++        return 0
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_invalidate_prefix_returns_correct_count():
+    cache = LRUCache()
+    cache.set("user:1", "x")
+    cache.set("user:2", "y")
+    cache.set("post:1", "z")
+    assert cache.invalidate_prefix("user:") == 2
+    assert cache.get("user:1") is None
+    assert cache.get("user:2") is None
+    assert cache.get("post:1") == "z"
+
+
+╭──────────────────────────────── survivor 12 ─────────────────────────────────╮
+│ invalidate_prefix silently does nothing (removes no keys) but still reports  │
+│ a truthy-looking count based on matches found before deletion is skipped     │
+│ victim/cache.py::LRUCache.invalidate_prefix   [missing_invalidation]         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -47,6 +47,4 @@
+         """Drop every key starting with ``prefix``. Returns how many went."""
+         doomed = [key for key in self._data if key.startswith(prefix)]
+-        for key in doomed:
+-            del self._data[key]
+         return len(doomed)
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_invalidate_prefix_actually_removes_keys():
+    cache = LRUCache()
+    cache.set("user:1", "x")
+    cache.set("user:2", "y")
+    cache.set("post:1", "z")
+
+    count = cache.invalidate_prefix("user:")
+
+    assert count == 2
+    assert cache.get("user:1") is None
+    assert cache.get("user:2") is None
+    assert cache.get("post:1") == "z"
+
+
+╭──────────────────────────────── survivor 13 ─────────────────────────────────╮
+│ invalidate_prefix only removes keys that exactly match the prefix elsewhere  │
+│ in the string rather than keys starting with it, so prefix-based             │
+│ invalidation of nested namespaces silently fails                             │
+│ victim/cache.py::LRUCache.invalidate_prefix   [wrong_operator]               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -46,5 +46,5 @@
+     def invalidate_prefix(self, prefix):
+         """Drop every key starting with ``prefix``. Returns how many went."""
+-        doomed = [key for key in self._data if key.startswith(prefix)]
++        doomed = [key for key in self._data if prefix in key and key != prefix]
+         for key in doomed:
+             del self._data[key]
+suggested test — passes on your code, fails on the mutant
+from victim.cache import LRUCache
+
+
+def test_invalidate_prefix_removes_key_equal_to_prefix():
+    cache = LRUCache()
+    cache.set("user:", "root")
+    cache.set("user:1", "x")
+    cache.set("user:2", "y")
+    cache.set("post:1", "z")
+
+    removed = cache.invalidate_prefix("user:")
+
+    assert removed == 3
+    assert cache.get("user:") is None
+    assert cache.get("user:1") is None
+    assert cache.get("user:2") is None
+    assert cache.get("post:1") == "z"
+
+
+╭──────────────────────────────── survivor 14 ─────────────────────────────────╮
+│ has_next incorrectly reports True on the last page because it treats the     │
+│ current page as still having more pages until it exceeds the count by one    │
+│ victim/pagination.py::Page.has_next   [off_by_one]                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page <= page_count(self.total, self.per_page)
+ 
+     @property
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_page_has_next_false_on_last_page():
+    result = paginate([1, 2, 3, 4, 5], page=2, per_page=3)
+    assert result.has_next is False
+
+
+╭──────────────────────────────── survivor 15 ─────────────────────────────────╮
+│ has_next always returns False, so callers never see a next-page indicator    │
+│ even when more pages exist                                                   │
+│ victim/pagination.py::Page.has_next   [wrong_operator]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return False
+ 
+     @property
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_page_has_next_true_when_more_pages_exist():
+    result = paginate([1, 2, 3, 4, 5], page=1, per_page=3)
+    assert result.has_next is True
+
+
+╭──────────────────────────────── survivor 16 ────────────────────────────────╮
+│ has_next is inverted, reporting no next page when one exists and vice versa │
+│ victim/pagination.py::Page.has_next   [inverted_condition]                  │
+╰─────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page >= page_count(self.total, self.per_page)
+ 
+     @property
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_page_has_next_correctly_reports_next_page():
+    result = paginate([1, 2, 3, 4, 5], page=1, per_page=2)
+    assert result.has_next is True
+
+    last_page = paginate([1, 2, 3, 4, 5], page=3, per_page=2)
+    assert last_page.has_next is False
+
+
+╭──────────────────────────────── survivor 17 ─────────────────────────────────╮
+│ On the first page, has_prev incorrectly reports True instead of False,       │
+│ suggesting there is a previous page when there isn't.                        │
+│ victim/pagination.py::Page.has_prev   [boundary_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page >= 1
+ 
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_page_has_prev_false_on_first_page():
+    result = paginate([1, 2, 3, 4, 5], page=1, per_page=3)
+    assert result.has_prev is False
+
+
+╭──────────────────────────────── survivor 18 ─────────────────────────────────╮
+│ has_prev always returns False, so the UI never shows a 'previous page' link  │
+│ even when one exists.                                                        │
+│ victim/pagination.py::Page.has_prev   [wrong_operator]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return False
+ 
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_page_has_prev_true_on_second_page():
+    result = paginate([1, 2, 3, 4, 5, 6], page=2, per_page=3)
+    assert result.has_prev is True
+
+
+╭──────────────────────────────── survivor 19 ─────────────────────────────────╮
+│ has_prev is inverted, returning True only on the first page and False        │
+│ everywhere else.                                                             │
+│ victim/pagination.py::Page.has_prev   [inverted_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return not (self.page > 1)
+ 
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_page_has_prev_values():
+    first_page = paginate([1, 2, 3, 4, 5, 6], page=1, per_page=3)
+    second_page = paginate([1, 2, 3, 4, 5, 6], page=2, per_page=3)
+
+    assert first_page.has_prev is False
+    assert second_page.has_prev is True
+
+
+╭──────────────────────────────── survivor 20 ─────────────────────────────────╮
+│ page_count silently returns 0 for negative totals instead of treating them   │
+│ as invalid, masking upstream bugs that pass a negative count.                │
+│ victim/pagination.py::page_count   [boundary_condition]                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -25,5 +25,5 @@
+     if per_page < 1:
+         raise ValueError("per_page must be >= 1")
+-    if total <= 0:
++    if total < 0:
+         return 0
+     return (total + per_page - 1) // per_page
+suggested test — passes on your code but does not catch this mutant
+from victim.pagination import page_count
+
+
+def test_page_count_negative_total_treated_as_empty():
+    # A negative total is not a valid page count scenario, but per the
+    # documented contract ("total <= 0" returns 0), it must still behave
+    # identically to total == 0, not be special-cased away by an
+    # off-by-one boundary check.
+    assert page_count(-5, 3) == page_count(0, 3) == 0
+
+
+╭──────────────────────────────── survivor 21 ─────────────────────────────────╮
+│ Calling page_count with per_page exactly 1 now incorrectly raises a          │
+│ ValueError even though 1 is a valid page size.                               │
+│ victim/pagination.py::page_count   [wrong_operator]                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -23,5 +23,5 @@
+ def page_count(total, per_page):
+     """Number of pages needed to hold ``total`` items."""
+-    if per_page < 1:
++    if per_page <= 1:
+         raise ValueError("per_page must be >= 1")
+     if total <= 0:
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import page_count
+
+
+def test_page_count_accepts_per_page_of_one():
+    assert page_count(5, 1) == 5
+
+
+╭──────────────────────────────── survivor 22 ─────────────────────────────────╮
+│ The 'total' count reported on a page is always one less than the true number │
+│ of items, making has_next and other calculations based on total slightly     │
+│ wrong.                                                                       │
+│ victim/pagination.py::paginate   [off_by_one]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -45,5 +45,5 @@
+         page=page,
+         per_page=per_page,
+-        total=len(items),
++        total=len(items) - 1,
+     )
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.pagination import paginate
+
+
+def test_paginate_total_matches_item_count():
+    result = paginate([1, 2, 3, 4, 5], page=1, per_page=3)
+    assert result.total == 5
+
+
+╭──────────────────────────────── survivor 23 ─────────────────────────────────╮
+│ Duration strings with a trailing number but no unit (e.g. '1h30') silently   │
+│ succeed instead of raising an error, returning only the hours portion        │
+│ victim/parsing.py::parse_duration   [swallowed_error]                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -34,5 +34,5 @@
+             raise ValueError("unexpected character %r in %r" % (char, text))
+ 
+-    if number:
++    if number and False:
+         raise ValueError("trailing number without a unit: %r" % text)
+     if not matched:
+suggested test — passes on your code, fails on the mutant
+import pytest
+
+from victim.parsing import parse_duration
+
+
+def test_parse_duration_rejects_trailing_number_without_unit():
+    with pytest.raises(ValueError):
+        parse_duration("1h30")
+
+
+╭──────────────────────────────── survivor 24 ─────────────────────────────────╮
+│ Whitespace-only input like a string of spaces is treated as empty before     │
+│ stripping is checked, but leading/trailing whitespace inside mixed durations │
+│ like '1h 30m' now silently drops the space instead of raising, changing      │
+│ which strings are accepted vs rejected inconsistently                        │
+│ victim/parsing.py::parse_duration   [wrong_operator]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -31,4 +31,6 @@
+             number = ""
+             matched = True
++        elif char == " ":
++            pass
+         else:
+             raise ValueError("unexpected character %r in %r" % (char, text))
+suggested test — passes on your code, fails on the mutant
+import pytest
+
+from victim.parsing import parse_duration
+
+
+def test_parse_duration_rejects_internal_whitespace():
+    with pytest.raises(ValueError):
+        parse_duration("1h 30m")
+
+
+╭──────────────────────────────── survivor 25 ─────────────────────────────────╮
+│ Passing an empty string after stripping (e.g. all-whitespace input) no       │
+│ longer raises immediately and instead falls through, eventually raising a    │
+│ different, less specific error about no duration found                       │
+│ victim/parsing.py::parse_duration   [boundary_condition]                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -13,6 +13,6 @@
+         raise ValueError("duration must not be None")
+     text = text.strip().lower()
+-    if not text:
+-        raise ValueError("duration must not be empty")
++    if text == "":
++        pass
+ 
+     if text.isdigit():
+suggested test — passes on your code, fails on the mutant
+import pytest
+
+from victim.parsing import parse_duration
+
+
+def test_parse_duration_empty_after_strip_raises_specific_error():
+    with pytest.raises(ValueError, match="must not be empty"):
+        parse_duration("   ")
+
+
+╭──────────────────────────────── survivor 26 ─────────────────────────────────╮
+│ Values are no longer stripped of surrounding whitespace, so keys like 'a'    │
+│ end up mapped to ' 1' instead of '1'.                                        │
+│ victim/parsing.py::parse_key_values   [other]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -62,5 +62,5 @@
+         if not key:
+             raise ValueError("segment with an empty key: %r" % segment)
+-        result[key] = value.strip()
++        result[key] = value
+     return result
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.parsing import parse_key_values
+
+
+def test_parse_key_values_strips_value_whitespace():
+    assert parse_key_values("a= 1 ;b=2") == {"a": "1", "b": "2"}
+
+
+╭──────────────────────────────── survivor 27 ─────────────────────────────────╮
+│ An empty input string now returns None instead of an empty dict, breaking    │
+│ any caller that iterates or does membership checks on the result.            │
+│ victim/parsing.py::parse_key_values   [wrong_default]                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -49,5 +49,5 @@
+     """
+     if not text:
+-        return {}
++        return None
+ 
+     result = {}
+suggested test — passes on your code, fails on the mutant
+from victim.parsing import parse_key_values
+
+
+def test_parse_key_values_empty_string_returns_empty_dict():
+    assert parse_key_values("") == {}
+
+
+╭──────────────────────────────── survivor 28 ─────────────────────────────────╮
+│ When the same key appears multiple times, the first occurrence wins instead  │
+│ of the last, contradicting the documented override behavior.                 │
+│ victim/parsing.py::parse_key_values   [inverted_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -62,5 +62,6 @@
+         if not key:
+             raise ValueError("segment with an empty key: %r" % segment)
+-        result[key] = value.strip()
++        if key not in result:
++            result[key] = value.strip()
+     return result
+ 
+suggested test — passes on your code, fails on the mutant
+from victim.parsing import parse_key_values
+
+
+def test_parse_key_values_later_key_overrides_earlier():
+    assert parse_key_values("a=1;a=2") == {"a": "2"}
+
+
+╭──────────────────────────────── survivor 29 ─────────────────────────────────╮
+│ The discount cap is ignored when the computed discount is smaller than       │
+│ max_discount, effectively swapping which value is used as the cap versus the │
+│ actual discount, so discounts can exceed the intended maximum in some cases. │
+│ victim/pricing.py::apply_discount   [wrong_operator]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -19,5 +19,5 @@
+     discount = price * percent / 100.0
+     if max_discount is not None:
+-        discount = min(discount, max_discount)
++        discount = max(discount, max_discount)
+ 
+     return round(price - discount, 2)
+suggested test — passes on your code, fails on the mutant
+from victim.pricing import apply_discount
+
+
+def test_apply_discount_cap_limits_small_discount():
+    # discount computed = 100 * 5 / 100 = 5, which is less than max_discount=10,
+    # so the cap should not increase the discount beyond the computed value.
+    assert apply_discount(100, 5, max_discount=10) == 95.0
+
+
+╭──────────────────────────────── survivor 30 ─────────────────────────────────╮
+│ Negative percent values are silently accepted instead of raising an error,   │
+│ since the boundary check no longer rejects them.                             │
+│ victim/pricing.py::apply_discount   [boundary_condition]                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -14,5 +14,5 @@
+     if percent is None:
+         percent = 0
+-    if percent < 0 or percent > 100:
++    if percent > 100:
+         raise ValueError("percent must be between 0 and 100")
+ 
+suggested test — passes on your code, fails on the mutant
+import pytest
+
+from victim.pricing import apply_discount
+
+
+def test_apply_discount_rejects_negative_percent():
+    with pytest.raises(ValueError):
+        apply_discount(100, -10)
+
+
+╭──────────────────────────────── survivor 31 ─────────────────────────────────╮
+│ Passing percent=None now raises an error instead of being treated as no      │
+│ discount, breaking callers that rely on this documented fallback behavior.   │
+│ victim/pricing.py::apply_discount   [wrong_default]                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -13,5 +13,5 @@
+         raise ValueError("price must be >= 0")
+     if percent is None:
+-        percent = 0
++        percent = 100
+     if percent < 0 or percent > 100:
+         raise ValueError("percent must be between 0 and 100")
+suggested test — passes on your code, fails on the mutant
+from victim.pricing import apply_discount
+
+
+def test_apply_discount_none_percent_means_no_discount():
+    assert apply_discount(100, None) == 100.0
+
+
+9 killed  31 survived
+45 LLM calls (anthropic/claude-sonnet-5)  ~$0.261  in 232.7s
+markdown report → 
+/var/folders/fx/rkfz5g5d5bggftkjvpvxp11c0000gn/T/mutagen-bench-4fy66ft5/victim/b
+ench.md
+json report → 
+/var/folders/fx/rkfz5g5d5bggftkjvpvxp11c0000gn/T/mutagen-bench-4fy66ft5/victim/b
+ench.json
+
+====================================================================
+mode              live (real API calls)
+provider          openrouter
+model             anthropic/claude-sonnet-5
+mutants           40
+  killed            9   22.5%
+  survived         31   77.5%
+  timeout           0    0.0%
+  error             0    0.0%
+  unapplicable      0    0.0%
+mutation score    22.5%
+wall time         232.8s
+llm calls         45 (0 cached)
+tokens            72947 in / 11552 out
+cost              $0.2614
+====================================================================

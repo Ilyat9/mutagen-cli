@@ -1,0 +1,149 @@
+name: mutagen
+description: Mutation-test the code changed in a pull request and comment the survivors.
+branding:
+  icon: alert-triangle
+  color: red
+
+inputs:
+  provider:
+    description: LLM provider. "openrouter" (works from Russia without a VPN) or "anthropic".
+    required: false
+    default: anthropic
+  anthropic-api-key:
+    description: Anthropic API key. Store it as a repository secret. Required when provider is "anthropic".
+    required: false
+  openrouter-api-key:
+    description: OpenRouter API key (https://openrouter.ai/keys). Required when provider is "openrouter".
+    required: false
+  github-token:
+    description: Token used to post the PR comment. Needs pull-requests:write.
+    required: false
+    default: ${{ github.token }}
+  base:
+    description: Ref to diff against. Defaults to the PR's base branch.
+    required: false
+    default: ""
+  max-mutants:
+    description: Ceiling on generated mutants.
+    required: false
+    default: "25"
+  model:
+    description: Model id. Empty for the provider's default.
+    required: false
+    default: ""
+  effort:
+    description: low | medium | high | xhigh | max
+    required: false
+    default: medium
+  invent:
+    description: Also generate a test for each survivor.
+    required: false
+    default: "false"
+  fail-under:
+    description: Fail the job if the mutation score is below this percentage. Empty to never fail.
+    required: false
+    default: ""
+  comment:
+    description: Post the report as a PR comment.
+    required: false
+    default: "true"
+
+outputs:
+  score:
+    description: Mutation score as a percentage, or empty if no viable mutants.
+    value: ${{ steps.mutate.outputs.score }}
+  survivors:
+    description: Number of surviving mutants.
+    value: ${{ steps.mutate.outputs.survivors }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install mutagen
+      shell: bash
+      # Installed from the action's own checkout rather than PyPI: the package
+      # is not published yet, and this pins mutagen to the same ref the workflow
+      # already picked with `uses: mutagen-cli/mutagen@<ref>`. Switch to
+      # `pip install mutagen-cli` once the package is on PyPI.
+      run: pip install --quiet "${{ github.action_path }}"
+
+    - name: Run mutagen
+      id: mutate
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter-api-key }}
+      run: |
+        set -o pipefail
+        base="${{ inputs.base }}"
+        if [ -z "$base" ]; then
+          base="origin/${{ github.event.pull_request.base.ref }}"
+        fi
+        git fetch --quiet origin "${{ github.event.pull_request.base.ref }}" --depth=200 || true
+
+        args=(run --base "$base"
+              --max-mutants "${{ inputs.max-mutants }}"
+              --provider "${{ inputs.provider }}"
+              --effort "${{ inputs.effort }}"
+              --report-md mutagen-report.md
+              --report-json mutagen-report.json)
+        if [ -n "${{ inputs.model }}" ]; then
+          args+=(--model "${{ inputs.model }}")
+        fi
+        if [ "${{ inputs.invent }}" = "true" ]; then
+          args+=(--invent)
+        fi
+
+        # Capture the exit code; --fail-under is applied in a later step so the
+        # report still gets posted on a failing PR.
+        set +e
+        mutagen "${args[@]}"
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+
+        if [ -f mutagen-report.json ]; then
+          jq -r 'if .score == null then "score=" else "score=" + (.score * 100 | round | tostring) end' \
+            mutagen-report.json >> "$GITHUB_OUTPUT"
+          jq -r '"survivors=" + (.counts.survived // 0 | tostring)' \
+            mutagen-report.json >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        [ -f mutagen-report.md ] || exit 0
+        marker='<!-- mutagen-report -->'
+        { echo "$marker"; cat mutagen-report.md; } > comment.md
+
+        number="${{ github.event.pull_request.number }}"
+        existing=$(gh api "repos/${{ github.repository }}/issues/$number/comments" \
+          --jq "map(select(.body | startswith(\"$marker\"))) | .[0].id // empty")
+
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$existing" \
+            -F body=@comment.md >/dev/null
+        else
+          gh api -X POST "repos/${{ github.repository }}/issues/$number/comments" \
+            -F body=@comment.md >/dev/null
+        fi
+
+    - name: Apply the gate
+      shell: bash
+      run: |
+        threshold="${{ inputs.fail-under }}"
+        score="${{ steps.mutate.outputs.score }}"
+        code="${{ steps.mutate.outputs.exit-code }}"
+
+        if [ "$code" != "0" ] && [ "$code" != "1" ]; then
+          echo "::error::mutagen failed to run (exit $code)"
+          exit "$code"
+        fi
+        if [ -n "$threshold" ] && [ -n "$score" ] && [ "$score" -lt "$threshold" ]; then
+          echo "::error::mutation score ${score}% is below the ${threshold}% threshold"
+          exit 1
+        fi
+        echo "mutation score: ${score:-n/a}%"

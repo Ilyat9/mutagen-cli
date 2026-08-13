@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mutagen-cli"
+version = "0.1.0"
+description = "Your tests are green. Here's what they don't catch."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "mutagen contributors" }]
+keywords = ["mutation-testing", "pytest", "llm", "testing", "claude"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "anthropic>=0.40",
+    "click>=8.1",
+    "httpx>=0.24",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/mutagen-cli/mutagen"
+Issues = "https://github.com/mutagen-cli/mutagen/issues"
+
+[project.scripts]
+mutagen = "mutagen_cli.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mutagen_cli"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["tests/fixtures", ".venv", "build", "dist"]

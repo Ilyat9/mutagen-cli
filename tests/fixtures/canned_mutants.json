@@ -1,0 +1,247 @@
+{
+  "_comment": [
+    "A fixed mutant set for the polygon, used by scripts/benchmark.py to exercise",
+    "the engine without spending API calls. These are hand-written to resemble what",
+    "the model produces; they measure the ENGINE (apply, run, verdict), not model",
+    "quality. `expected` is the verdict predicted by reading tests/fixtures/",
+    "victim_project/WEAK_TESTS.md. A mismatch is a finding either way."
+  ],
+
+  "victim/cache.py::LRUCache.get": [
+    {
+      "description": "reading a key no longer refreshes its recency, so the hottest keys are the ones evicted",
+      "bug_category": "missing_invalidation",
+      "search_block": "        self._data.move_to_end(key)",
+      "replace_block": "        pass",
+      "expected": "survived"
+    },
+    {
+      "description": "a miss is counted as a hit, so cache hit-rate metrics silently read 100%",
+      "bug_category": "wrong_operator",
+      "search_block": "            self.misses += 1",
+      "replace_block": "            self.hits += 1",
+      "expected": "survived"
+    }
+  ],
+
+  "victim/cache.py::LRUCache.set": [
+    {
+      "description": "the cache evicts one entry early, so it never holds its full capacity",
+      "bug_category": "boundary_condition",
+      "search_block": "        if len(self._data) > self.capacity:",
+      "replace_block": "        if len(self._data) >= self.capacity:",
+      "expected": "survived"
+    },
+    {
+      "description": "eviction drops the newest entry instead of the oldest, inverting the whole LRU policy",
+      "bug_category": "wrong_default",
+      "search_block": "            self._data.popitem(last=False)",
+      "replace_block": "            self._data.popitem(last=True)",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/cache.py::LRUCache.invalidate_prefix": [
+    {
+      "description": "the prefix test is inverted, so bulk invalidation quietly removes nothing",
+      "bug_category": "argument_order",
+      "search_block": "        doomed = [key for key in self._data if key.startswith(prefix)]",
+      "replace_block": "        doomed = [key for key in self._data if prefix.startswith(key)]",
+      "expected": "survived"
+    },
+    {
+      "description": "the count of invalidated keys is never returned, so callers cannot tell whether anything was purged",
+      "bug_category": "missing_return",
+      "search_block": "        return len(doomed)",
+      "replace_block": "        return None",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/cache.py::LRUCache.invalidate": [
+    {
+      "description": "invalidating an existing key reports failure, so retry loops invalidate forever",
+      "bug_category": "missing_return",
+      "search_block": "            return True",
+      "replace_block": "            return False",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/cache.py::LRUCache.__init__": [
+    {
+      "description": "a capacity of zero is accepted, producing a cache that evicts every write",
+      "bug_category": "boundary_condition",
+      "search_block": "        if capacity < 1:",
+      "replace_block": "        if capacity < 0:",
+      "expected": "survived"
+    }
+  ],
+
+  "victim/pagination.py::Page.has_next": [
+    {
+      "description": "the last page reports that another page follows, so clients loop one page past the end",
+      "bug_category": "off_by_one",
+      "search_block": "        return self.page < page_count(self.total, self.per_page)",
+      "replace_block": "        return self.page <= page_count(self.total, self.per_page)",
+      "expected": "survived"
+    }
+  ],
+
+  "victim/pagination.py::Page.has_prev": [
+    {
+      "description": "the first page reports a previous page, so back buttons render on page one",
+      "bug_category": "boundary_condition",
+      "search_block": "        return self.page > 1",
+      "replace_block": "        return self.page >= 1",
+      "expected": "survived"
+    }
+  ],
+
+  "victim/pagination.py::page_count": [
+    {
+      "description": "page counting truncates instead of rounding up, so the final partial page is unreachable",
+      "bug_category": "off_by_one",
+      "search_block": "    return (total + per_page - 1) // per_page",
+      "replace_block": "    return total // per_page",
+      "expected": "survived"
+    },
+    {
+      "description": "an empty collection reports one page, so the UI renders an empty page instead of an empty state",
+      "bug_category": "empty_input",
+      "search_block": "    if total <= 0:\n        return 0",
+      "replace_block": "    if total <= 0:\n        return 1",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/pagination.py::paginate": [
+    {
+      "description": "every page is offset by one page, so the first page of results is never shown",
+      "bug_category": "off_by_one",
+      "search_block": "    start = (page - 1) * per_page",
+      "replace_block": "    start = page * per_page",
+      "expected": "killed"
+    },
+    {
+      "description": "each page returns one item too few, so one record per page disappears",
+      "bug_category": "off_by_one",
+      "search_block": "    end = start + per_page",
+      "replace_block": "    end = start + per_page - 1",
+      "expected": "killed"
+    },
+    {
+      "description": "page zero is accepted and silently returns an empty slice instead of erroring",
+      "bug_category": "boundary_condition",
+      "search_block": "    if page < 1:\n        raise ValueError(\"page must be >= 1\")",
+      "replace_block": "    if page < 0:\n        raise ValueError(\"page must be >= 1\")",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/parsing.py::parse_duration": [
+    {
+      "description": "surrounding whitespace is no longer trimmed, so a value copied from a config file raises",
+      "bug_category": "none_handling",
+      "search_block": "    text = text.strip().lower()",
+      "replace_block": "    text = text.lower()",
+      "expected": "survived"
+    },
+    {
+      "description": "multi-unit durations keep only the last unit, so \"1h30m\" parses as 30 minutes",
+      "bug_category": "wrong_operator",
+      "search_block": "            total += int(number) * _UNIT_SECONDS[char]",
+      "replace_block": "            total = int(number) * _UNIT_SECONDS[char]",
+      "expected": "killed"
+    },
+    {
+      "description": "a bare number is read as minutes rather than seconds, inflating every timeout sixtyfold",
+      "bug_category": "wrong_default",
+      "search_block": "        return int(text)",
+      "replace_block": "        return int(text) * 60",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/parsing.py::parse_key_values": [
+    {
+      "description": "a value containing '=' now raises instead of parsing, breaking query strings and connection URLs",
+      "bug_category": "boundary_condition",
+      "search_block": "        key, value = segment.split(\"=\", 1)",
+      "replace_block": "        key, value = segment.split(\"=\")",
+      "expected": "survived"
+    },
+    {
+      "description": "values keep their surrounding whitespace, so \"a = 1\" yields \" 1\" and comparisons fail",
+      "bug_category": "none_handling",
+      "search_block": "        result[key] = value.strip()",
+      "replace_block": "        result[key] = value",
+      "expected": "survived"
+    }
+  ],
+
+  "victim/pricing.py::apply_discount": [
+    {
+      "description": "the discount cap acts as a floor, so capped promotions give away more than intended",
+      "bug_category": "wrong_operator",
+      "search_block": "        discount = min(discount, max_discount)",
+      "replace_block": "        discount = max(discount, max_discount)",
+      "expected": "survived"
+    },
+    {
+      "description": "a negative percentage is accepted and increases the price instead of erroring",
+      "bug_category": "boundary_condition",
+      "search_block": "    if percent < 0 or percent > 100:",
+      "replace_block": "    if percent > 100:",
+      "expected": "survived"
+    },
+    {
+      "description": "prices are rounded to whole units, so every discounted total loses its cents",
+      "bug_category": "wrong_default",
+      "search_block": "    return round(price - discount, 2)",
+      "replace_block": "    return round(price - discount, 0)",
+      "expected": "survived"
+    },
+    {
+      "description": "the discount is computed ten times too large, zeroing out most orders",
+      "bug_category": "wrong_operator",
+      "search_block": "    discount = price * percent / 100.0",
+      "replace_block": "    discount = price * percent / 10.0",
+      "expected": "killed"
+    }
+  ],
+
+  "victim/text.py::truncate": [
+    {
+      "description": "truncation cuts one character too many, dropping a letter from every shortened string",
+      "bug_category": "off_by_one",
+      "search_block": "    return text[: limit - len(suffix)] + suffix",
+      "replace_block": "    return text[: limit - len(suffix) - 1] + suffix",
+      "expected": "survived"
+    },
+    {
+      "description": "a string exactly at the limit is truncated anyway, mangling values that fit",
+      "bug_category": "boundary_condition",
+      "search_block": "    if len(text) <= limit:",
+      "replace_block": "    if len(text) < limit:",
+      "expected": "survived"
+    }
+  ],
+
+  "victim/text.py::normalize_whitespace": [
+    {
+      "description": "None returns None instead of an empty string, so callers crash on concatenation",
+      "bug_category": "none_handling",
+      "search_block": "        return \"\"",
+      "replace_block": "        return None",
+      "expected": "killed"
+    },
+    {
+      "description": "words are joined without a separator, collapsing sentences into one run-on token",
+      "bug_category": "wrong_default",
+      "search_block": "    return \" \".join(text.split())",
+      "replace_block": "    return \"\".join(text.split())",
+      "expected": "killed"
+    }
+  ]
+}

@@ -1,0 +1,320 @@
+{
+  "victim/cache.py::LRUCache.__init__": {
+    "mutants": [
+      {
+        "description": "A cache created with capacity=0 is accepted instead of rejected, so callers get a cache that silently can never store anything.",
+        "bug_category": "boundary_condition",
+        "search_block": "        if capacity < 1:\n            raise ValueError(\"capacity must be >= 1\")",
+        "replace_block": "        if capacity < 0:\n            raise ValueError(\"capacity must be >= 1\")"
+      },
+      {
+        "description": "The default cache capacity is smaller than documented (100 instead of 128), so callers relying on the default silently get less caching headroom and see extra evictions.",
+        "bug_category": "wrong_default",
+        "search_block": "    def __init__(self, capacity=128):",
+        "replace_block": "    def __init__(self, capacity=100):"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.__len__": {
+    "mutants": [
+      {
+        "description": "len(cache) undercounts by one, so callers relying on the reported size see one fewer entry than actually stored.",
+        "bug_category": "off_by_one",
+        "search_block": "    def __len__(self):\n        return len(self._data)",
+        "replace_block": "    def __len__(self):\n        return len(self._data) - 1"
+      },
+      {
+        "description": "len(cache) always reports zero regardless of how many entries are stored, breaking any capacity or emptiness check based on it.",
+        "bug_category": "other",
+        "search_block": "    def __len__(self):\n        return len(self._data)",
+        "replace_block": "    def __len__(self):\n        return 0"
+      },
+      {
+        "description": "len(cache) overcounts by one, so callers relying on the reported size see one more entry than actually stored.",
+        "bug_category": "off_by_one",
+        "search_block": "    def __len__(self):\n        return len(self._data)",
+        "replace_block": "    def __len__(self):\n        return len(self._data) + 1"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.get": {
+    "mutants": [
+      {
+        "description": "Reading a key from the cache no longer marks it as recently used, so it can be evicted even though it was just accessed.",
+        "bug_category": "state_leak",
+        "search_block": "        self._data.move_to_end(key)\n        return self._data[key]",
+        "replace_block": "        return self._data[key]"
+      },
+      {
+        "description": "A cache hit is recorded as a miss, so hit/miss statistics used for monitoring cache effectiveness are wrong.",
+        "bug_category": "other",
+        "search_block": "        self.hits += 1\n        self._data.move_to_end(key)",
+        "replace_block": "        self.misses += 1\n        self._data.move_to_end(key)"
+      },
+      {
+        "description": "get() returns the default for keys that are present and crashes instead of returning the default for missing keys, inverting the cache lookup entirely.",
+        "bug_category": "inverted_condition",
+        "search_block": "        if key not in self._data:",
+        "replace_block": "        if key in self._data:"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.set": {
+    "mutants": [
+      {
+        "description": "The cache evicts one entry too early, dropping the least-recently-used item before the cache is actually full.",
+        "bug_category": "boundary_condition",
+        "search_block": "        if len(self._data) > self.capacity:",
+        "replace_block": "        if len(self._data) >= self.capacity:"
+      },
+      {
+        "description": "Overwriting an existing key's value does not refresh its recency, so it can be evicted as if it hadn't been touched recently.",
+        "bug_category": "state_leak",
+        "search_block": "        if key in self._data:\n            self._data.move_to_end(key)\n        self._data[key] = value",
+        "replace_block": "        self._data[key] = value"
+      },
+      {
+        "description": "When the cache is full it evicts the item that was just inserted instead of the least-recently-used one, defeating the purpose of the LRU cache.",
+        "bug_category": "wrong_operator",
+        "search_block": "            self._data.popitem(last=False)",
+        "replace_block": "            self._data.popitem(last=True)"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.invalidate": {
+    "mutants": [
+      {
+        "description": "Invalidating a key that was never cached returns None instead of False, so callers checking the boolean result of invalidate() get an unexpected falsy-but-wrong value that can break stricter checks like `is False`.",
+        "bug_category": "wrong_default",
+        "search_block": "        return False",
+        "replace_block": "        return None"
+      },
+      {
+        "description": "invalidate() reports success without actually removing the entry, so the stale value stays in the cache and callers keep reading it.",
+        "bug_category": "swallowed_error",
+        "search_block": "            del self._data[key]\n            return True",
+        "replace_block": "            return True"
+      },
+      {
+        "description": "invalidate() is inverted: it deletes and reports True only for keys that are NOT cached, and does nothing for keys that ARE cached, so real entries never get invalidated.",
+        "bug_category": "inverted_condition",
+        "search_block": "        if key in self._data:\n            del self._data[key]\n            return True\n        return False",
+        "replace_block": "        if key not in self._data:\n            del self._data[key]\n            return True\n        return False"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.invalidate_prefix": {
+    "mutants": [
+      {
+        "description": "invalidate_prefix reports how many keys it removed but never actually deletes them, so cached values keep being served after they should have been invalidated.",
+        "bug_category": "missing_invalidation",
+        "search_block": "        doomed = [key for key in self._data if key.startswith(prefix)]\n        for key in doomed:\n            del self._data[key]\n        return len(doomed)",
+        "replace_block": "        doomed = [key for key in self._data if key.startswith(prefix)]\n        return len(doomed)"
+      },
+      {
+        "description": "invalidate_prefix matches keys by suffix instead of prefix, so it silently fails to invalidate the keys callers actually meant to clear and may clear unrelated ones.",
+        "bug_category": "wrong_operator",
+        "search_block": "        doomed = [key for key in self._data if key.startswith(prefix)]",
+        "replace_block": "        doomed = [key for key in self._data if key.endswith(prefix)]"
+      },
+      {
+        "description": "invalidate_prefix under-reports the number of keys removed by one, which throws off any caller (or logging/metrics) that relies on the count to confirm the right number of entries were cleared.",
+        "bug_category": "off_by_one",
+        "search_block": "        return len(doomed)",
+        "replace_block": "        return len(doomed) - 1"
+      }
+    ]
+  },
+  "victim/pagination.py::Page.has_next": {
+    "mutants": [
+      {
+        "description": "has_next stays true on the last page, so pagers try to fetch a page beyond the end of the data.",
+        "bug_category": "boundary_condition",
+        "search_block": "        return self.page < page_count(self.total, self.per_page)",
+        "replace_block": "        return self.page <= page_count(self.total, self.per_page)"
+      },
+      {
+        "description": "has_next is backwards: it reports no next page while more pages remain, and reports a next page once you're past the end.",
+        "bug_category": "inverted_condition",
+        "search_block": "        return self.page < page_count(self.total, self.per_page)",
+        "replace_block": "        return self.page > page_count(self.total, self.per_page)"
+      },
+      {
+        "description": "has_next computes the page count with the arguments swapped, producing a wildly wrong result whenever total and per_page differ, so pagination stops or continues at the wrong point.",
+        "bug_category": "argument_order",
+        "search_block": "        return self.page < page_count(self.total, self.per_page)",
+        "replace_block": "        return self.page < page_count(self.per_page, self.total)"
+      }
+    ]
+  },
+  "victim/pagination.py::Page.has_prev": {
+    "mutants": [
+      {
+        "description": "has_prev reports true even on the first page, so pagers show a 'previous' control that leads nowhere.",
+        "bug_category": "boundary_condition",
+        "search_block": "        return self.page > 1",
+        "replace_block": "        return self.page >= 1"
+      },
+      {
+        "description": "has_prev stays false on page 2 as well as page 1, so users can't navigate back to the second page.",
+        "bug_category": "off_by_one",
+        "search_block": "        return self.page > 1",
+        "replace_block": "        return self.page > 2"
+      },
+      {
+        "description": "has_prev is inverted and is essentially always false, so the previous-page control never appears even when earlier pages exist.",
+        "bug_category": "inverted_condition",
+        "search_block": "        return self.page > 1",
+        "replace_block": "        return self.page < 1"
+      }
+    ]
+  },
+  "victim/pagination.py::page_count": {
+    "mutants": [
+      {
+        "description": "page_count silently drops the ceiling: 11 items at 5 per page reports 2 pages instead of 3, so the last partial page of results is missed entirely.",
+        "bug_category": "off_by_one",
+        "search_block": "    return (total + per_page - 1) // per_page",
+        "replace_block": "    return total // per_page"
+      },
+      {
+        "description": "page_count rejects a valid per_page of exactly 1, so callers who page one item at a time get an unexpected ValueError.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if per_page < 1:",
+        "replace_block": "    if per_page <= 1:"
+      },
+      {
+        "description": "page_count divides by the wrong quantity, producing a wildly incorrect page count whenever total and per_page differ.",
+        "bug_category": "argument_order",
+        "search_block": "    return (total + per_page - 1) // per_page",
+        "replace_block": "    return (per_page + total - 1) // total"
+      }
+    ]
+  },
+  "victim/pagination.py::paginate": {
+    "mutants": [
+      {
+        "description": "Calling paginate() with items=None crashes instead of being treated as an empty result set.",
+        "bug_category": "none_handling",
+        "search_block": "    if items is None:\n        items = []\n",
+        "replace_block": ""
+      },
+      {
+        "description": "paginate() accepts per_page=0, silently returning an empty page forever instead of rejecting the invalid input.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if per_page < 1:\n        raise ValueError(\"per_page must be >= 1\")",
+        "replace_block": "    if per_page < 0:\n        raise ValueError(\"per_page must be >= 1\")"
+      },
+      {
+        "description": "The page's reported total item count is the size of the current slice instead of the whole collection, so has_next/has_prev and downstream page counts silently become wrong once results span more than one page.",
+        "bug_category": "other",
+        "search_block": "        total=len(items),\n    )",
+        "replace_block": "        total=len(items[start:end]),\n    )"
+      }
+    ]
+  },
+  "victim/parsing.py::parse_duration": {
+    "mutants": [
+      {
+        "description": "Durations with surrounding whitespace like ' 1h30m ' are rejected instead of parsed, because the input is no longer trimmed before parsing.",
+        "bug_category": "other",
+        "search_block": "    text = text.strip().lower()",
+        "replace_block": "    text = text.lower()"
+      },
+      {
+        "description": "A duration with a trailing number and no unit, like '1h30', silently drops the trailing amount instead of raising, so the parsed duration is smaller than what the caller wrote.",
+        "bug_category": "swallowed_error",
+        "search_block": "    if number:\n        raise ValueError(\"trailing number without a unit: %r\" % text)\n",
+        "replace_block": ""
+      },
+      {
+        "description": "Only the last unit in a compound duration like '1h30m' counts; earlier components are overwritten instead of summed, so the total is far too small.",
+        "bug_category": "wrong_operator",
+        "search_block": "            total += int(number) * _UNIT_SECONDS[char]",
+        "replace_block": "            total = int(number) * _UNIT_SECONDS[char]"
+      }
+    ]
+  },
+  "victim/parsing.py::parse_key_values": {
+    "mutants": [
+      {
+        "description": "A value that itself contains an '=' character, like 'a=b=c', crashes instead of splitting on only the first '=' as documented.",
+        "bug_category": "wrong_operator",
+        "search_block": "        key, value = segment.split(\"=\", 1)",
+        "replace_block": "        key, value = segment.split(\"=\")"
+      },
+      {
+        "description": "Leading and trailing whitespace around values is preserved instead of stripped, so ' a = 1 ' keeps stray spaces in the parsed value.",
+        "bug_category": "other",
+        "search_block": "        result[key] = value.strip()",
+        "replace_block": "        result[key] = value"
+      },
+      {
+        "description": "When the same key appears twice, the first value silently wins instead of the later one overriding it as documented.",
+        "bug_category": "other",
+        "search_block": "        key = key.strip()\n        if not key:\n            raise ValueError(\"segment with an empty key: %r\" % segment)\n        result[key] = value.strip()",
+        "replace_block": "        key = key.strip()\n        if not key:\n            raise ValueError(\"segment with an empty key: %r\" % segment)\n        if key not in result:\n            result[key] = value.strip()"
+      }
+    ]
+  },
+  "victim/pricing.py::apply_discount": {
+    "mutants": [
+      {
+        "description": "A max_discount cap acts as a minimum instead of a maximum, so discounts meant to be capped can end up larger than intended.",
+        "bug_category": "wrong_operator",
+        "search_block": "        discount = min(discount, max_discount)",
+        "replace_block": "        discount = max(discount, max_discount)"
+      },
+      {
+        "description": "Passing percent=None, which is documented as 'no discount', instead applies a full 100% discount, making the item free.",
+        "bug_category": "wrong_default",
+        "search_block": "    if percent is None:\n        percent = 0",
+        "replace_block": "    if percent is None:\n        percent = 100"
+      },
+      {
+        "description": "The discounted price is rounded to one decimal place instead of two cents of precision, silently losing sub-cent accuracy that downstream billing code expects.",
+        "bug_category": "other",
+        "search_block": "    return round(price - discount, 2)",
+        "replace_block": "    return round(price - discount, 1)"
+      }
+    ]
+  },
+  "victim/text.py::normalize_whitespace": {
+    "mutants": [
+      {
+        "description": "normalize_whitespace(None) returns None instead of the documented empty string, so callers that concatenate or call string methods on the result crash.",
+        "bug_category": "none_handling",
+        "search_block": "    if text is None:\n        return \"\"",
+        "replace_block": "    if text is None:\n        return None"
+      },
+      {
+        "description": "normalize_whitespace only collapses literal space characters, so runs of tabs or newlines are left in the output instead of being collapsed to a single space.",
+        "bug_category": "other",
+        "search_block": "    return \" \".join(text.split())",
+        "replace_block": "    return \" \".join(text.split(\" \"))"
+      }
+    ]
+  },
+  "victim/text.py::truncate": {
+    "mutants": [
+      {
+        "description": "Text exactly as long as the limit gets truncated and suffixed anyway instead of being returned unchanged.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if len(text) <= limit:\n        return text",
+        "replace_block": "    if len(text) < limit:\n        return text"
+      },
+      {
+        "description": "When the limit is smaller than the suffix itself, truncate returns the full suffix instead of trimming it to fit, so the result can exceed the requested limit.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if limit <= len(suffix):\n        return suffix[:limit]",
+        "replace_block": "    if limit <= len(suffix):\n        return suffix"
+      },
+      {
+        "description": "Truncated text is cut one character shorter than necessary before the suffix is appended, silently discarding an extra character of content that would have fit within the limit.",
+        "bug_category": "off_by_one",
+        "search_block": "    return text[: limit - len(suffix)] + suffix",
+        "replace_block": "    return text[: limit - len(suffix) - 1] + suffix"
+      }
+    ]
+  }
+}

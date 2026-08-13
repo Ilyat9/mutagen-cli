@@ -1,0 +1,1147 @@
+
+
+15 function(s) in 5 file(s) → up to 40 mutants, 15 LLM call(s) with 
+claude-opus-5
+
+warning: victim/cache.py::LRUCache.__init__: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/cache.py::LRUCache.__len__: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/cache.py::LRUCache.get: no API key found. Set ANTHROPIC_API_KEY,
+or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/cache.py::LRUCache.set: no API key found. Set ANTHROPIC_API_KEY,
+or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/cache.py::LRUCache.invalidate: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/cache.py::LRUCache.invalidate_prefix: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/pagination.py::Page.has_next: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/pagination.py::Page.has_prev: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/pagination.py::page_count: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/pagination.py::paginate: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/parsing.py::parse_duration: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/parsing.py::parse_key_values: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/pricing.py::apply_discount: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/text.py::normalize_whitespace: no API key found. Set 
+ANTHROPIC_API_KEY, or put {"api_key": "..."} in .mutagen/config.json
+warning: victim/text.py::truncate: no API key found. Set ANTHROPIC_API_KEY, or 
+put {"api_key": "..."} in .mutagen/config.json
+error: the model returned no usable mutants. Try --max-mutants or a different 
+--model.
+
+mutagen exited 2 without a report
+
+15 function(s) in 5 file(s) → up to 40 mutants, 15 LLM call(s) with 
+claude-opus-5
+
+
+
+╭──────────────────────────────────────────────────────╮
+│ mutation score  20%   (8 killed / 40 viable mutants) │
+╰──────────────────────────────────────────────────────╯
+
+file                  killed  survived  score
+victim/cache.py            4        13    24%
+victim/pagination.py       1        11     8%
+victim/parsing.py          1         5    17%
+victim/pricing.py          0         3     0%
+victim/text.py             2         -   100%
+
+32 bugs your tests would not catch
+
+╭───────────────────────────────── survivor 1 ─────────────────────────────────╮
+│ A cache created with capacity=0 is accepted instead of rejected, so callers  │
+│ get a cache that silently can never store anything.                          │
+│ victim/cache.py::LRUCache.__init__   [boundary_condition]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -10,5 +10,5 @@
+ 
+     def __init__(self, capacity=128):
+-        if capacity < 1:
++        if capacity < 0:
+             raise ValueError("capacity must be >= 1")
+         self.capacity = capacity
+
+╭───────────────────────────────── survivor 2 ─────────────────────────────────╮
+│ The default cache capacity is smaller than documented (100 instead of 128),  │
+│ so callers relying on the default silently get less caching headroom and see │
+│ extra evictions.                                                             │
+│ victim/cache.py::LRUCache.__init__   [wrong_default]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -9,5 +9,5 @@
+     """Least-recently-used cache bounded by ``capacity`` entries."""
+ 
+-    def __init__(self, capacity=128):
++    def __init__(self, capacity=100):
+         if capacity < 1:
+             raise ValueError("capacity must be >= 1")
+
+╭───────────────────────────────── survivor 3 ─────────────────────────────────╮
+│ len(cache) undercounts by one, so callers relying on the reported size see   │
+│ one fewer entry than actually stored.                                        │
+│ victim/cache.py::LRUCache.__len__   [off_by_one]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return len(self._data) - 1
+ 
+     def get(self, key, default=None):
+
+╭───────────────────────────────── survivor 4 ─────────────────────────────────╮
+│ len(cache) always reports zero regardless of how many entries are stored,    │
+│ breaking any capacity or emptiness check based on it.                        │
+│ victim/cache.py::LRUCache.__len__   [other]                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return 0
+ 
+     def get(self, key, default=None):
+
+╭───────────────────────────────── survivor 5 ─────────────────────────────────╮
+│ len(cache) overcounts by one, so callers relying on the reported size see    │
+│ one more entry than actually stored.                                         │
+│ victim/cache.py::LRUCache.__len__   [off_by_one]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return len(self._data) + 1
+ 
+     def get(self, key, default=None):
+
+╭───────────────────────────────── survivor 6 ─────────────────────────────────╮
+│ Reading a key from the cache no longer marks it as recently used, so it can  │
+│ be evicted even though it was just accessed.                                 │
+│ victim/cache.py::LRUCache.get   [state_leak]                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -26,5 +26,4 @@
+             return default
+         self.hits += 1
+-        self._data.move_to_end(key)
+         return self._data[key]
+ 
+
+╭───────────────────────────────── survivor 7 ─────────────────────────────────╮
+│ A cache hit is recorded as a miss, so hit/miss statistics used for           │
+│ monitoring cache effectiveness are wrong.                                    │
+│ victim/cache.py::LRUCache.get   [other]                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -25,5 +25,5 @@
+             self.misses += 1
+             return default
+-        self.hits += 1
++        self.misses += 1
+         self._data.move_to_end(key)
+         return self._data[key]
+
+╭───────────────────────────────── survivor 8 ─────────────────────────────────╮
+│ The cache evicts one entry too early, dropping the least-recently-used item  │
+│ before the cache is actually full.                                           │
+│ victim/cache.py::LRUCache.set   [boundary_condition]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -34,5 +34,5 @@
+             self._data.move_to_end(key)
+         self._data[key] = value
+-        if len(self._data) > self.capacity:
++        if len(self._data) >= self.capacity:
+             self._data.popitem(last=False)
+ 
+
+╭───────────────────────────────── survivor 9 ─────────────────────────────────╮
+│ Overwriting an existing key's value does not refresh its recency, so it can  │
+│ be evicted as if it hadn't been touched recently.                            │
+│ victim/cache.py::LRUCache.set   [state_leak]                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -31,6 +31,4 @@
+     def set(self, key, value):
+         """Store ``value``, evicting the least-recently-used entry if full."""
+-        if key in self._data:
+-            self._data.move_to_end(key)
+         self._data[key] = value
+         if len(self._data) > self.capacity:
+
+╭──────────────────────────────── survivor 10 ─────────────────────────────────╮
+│ Invalidating a key that was never cached returns None instead of False, so   │
+│ callers checking the boolean result of invalidate() get an unexpected        │
+│ falsy-but-wrong value that can break stricter checks like `is False`.        │
+│ victim/cache.py::LRUCache.invalidate   [wrong_default]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -42,5 +42,5 @@
+             del self._data[key]
+             return True
+-        return False
++        return None
+ 
+     def invalidate_prefix(self, prefix):
+
+╭──────────────────────────────── survivor 11 ─────────────────────────────────╮
+│ invalidate_prefix reports how many keys it removed but never actually        │
+│ deletes them, so cached values keep being served after they should have been │
+│ invalidated.                                                                 │
+│ victim/cache.py::LRUCache.invalidate_prefix   [missing_invalidation]         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -47,6 +47,4 @@
+         """Drop every key starting with ``prefix``. Returns how many went."""
+         doomed = [key for key in self._data if key.startswith(prefix)]
+-        for key in doomed:
+-            del self._data[key]
+         return len(doomed)
+ 
+
+╭──────────────────────────────── survivor 12 ─────────────────────────────────╮
+│ invalidate_prefix matches keys by suffix instead of prefix, so it silently   │
+│ fails to invalidate the keys callers actually meant to clear and may clear   │
+│ unrelated ones.                                                              │
+│ victim/cache.py::LRUCache.invalidate_prefix   [wrong_operator]               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -46,5 +46,5 @@
+     def invalidate_prefix(self, prefix):
+         """Drop every key starting with ``prefix``. Returns how many went."""
+-        doomed = [key for key in self._data if key.startswith(prefix)]
++        doomed = [key for key in self._data if key.endswith(prefix)]
+         for key in doomed:
+             del self._data[key]
+
+╭──────────────────────────────── survivor 13 ─────────────────────────────────╮
+│ invalidate_prefix under-reports the number of keys removed by one, which     │
+│ throws off any caller (or logging/metrics) that relies on the count to       │
+│ confirm the right number of entries were cleared.                            │
+│ victim/cache.py::LRUCache.invalidate_prefix   [off_by_one]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -49,4 +49,4 @@
+         for key in doomed:
+             del self._data[key]
+-        return len(doomed)
++        return len(doomed) - 1
+ 
+
+╭──────────────────────────────── survivor 14 ─────────────────────────────────╮
+│ has_next stays true on the last page, so pagers try to fetch a page beyond   │
+│ the end of the data.                                                         │
+│ victim/pagination.py::Page.has_next   [boundary_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page <= page_count(self.total, self.per_page)
+ 
+     @property
+
+╭──────────────────────────────── survivor 15 ─────────────────────────────────╮
+│ has_next is backwards: it reports no next page while more pages remain, and  │
+│ reports a next page once you're past the end.                                │
+│ victim/pagination.py::Page.has_next   [inverted_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page > page_count(self.total, self.per_page)
+ 
+     @property
+
+╭──────────────────────────────── survivor 16 ─────────────────────────────────╮
+│ has_next computes the page count with the arguments swapped, producing a     │
+│ wildly wrong result whenever total and per_page differ, so pagination stops  │
+│ or continues at the wrong point.                                             │
+│ victim/pagination.py::Page.has_next   [argument_order]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page < page_count(self.per_page, self.total)
+ 
+     @property
+
+╭──────────────────────────────── survivor 17 ─────────────────────────────────╮
+│ has_prev reports true even on the first page, so pagers show a 'previous'    │
+│ control that leads nowhere.                                                  │
+│ victim/pagination.py::Page.has_prev   [boundary_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page >= 1
+ 
+ 
+
+╭──────────────────────────────── survivor 18 ─────────────────────────────────╮
+│ has_prev stays false on page 2 as well as page 1, so users can't navigate    │
+│ back to the second page.                                                     │
+│ victim/pagination.py::Page.has_prev   [off_by_one]                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page > 2
+ 
+ 
+
+╭──────────────────────────────── survivor 19 ─────────────────────────────────╮
+│ has_prev is inverted and is essentially always false, so the previous-page   │
+│ control never appears even when earlier pages exist.                         │
+│ victim/pagination.py::Page.has_prev   [inverted_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page < 1
+ 
+ 
+
+╭──────────────────────────────── survivor 20 ─────────────────────────────────╮
+│ page_count silently drops the ceiling: 11 items at 5 per page reports 2      │
+│ pages instead of 3, so the last partial page of results is missed entirely.  │
+│ victim/pagination.py::page_count   [off_by_one]                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -27,5 +27,5 @@
+     if total <= 0:
+         return 0
+-    return (total + per_page - 1) // per_page
++    return total // per_page
+ 
+ 
+
+╭──────────────────────────────── survivor 21 ─────────────────────────────────╮
+│ page_count rejects a valid per_page of exactly 1, so callers who page one    │
+│ item at a time get an unexpected ValueError.                                 │
+│ victim/pagination.py::page_count   [boundary_condition]                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -23,5 +23,5 @@
+ def page_count(total, per_page):
+     """Number of pages needed to hold ``total`` items."""
+-    if per_page < 1:
++    if per_page <= 1:
+         raise ValueError("per_page must be >= 1")
+     if total <= 0:
+
+╭──────────────────────────────── survivor 22 ─────────────────────────────────╮
+│ Calling paginate() with items=None crashes instead of being treated as an    │
+│ empty result set.                                                            │
+│ victim/pagination.py::paginate   [none_handling]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -32,6 +32,4 @@
+ def paginate(items, page=1, per_page=10):
+     """Return the ``page``-th slice of ``items`` (pages are 1-based)."""
+-    if items is None:
+-        items = []
+     if page < 1:
+         raise ValueError("page must be >= 1")
+
+╭──────────────────────────────── survivor 23 ─────────────────────────────────╮
+│ paginate() accepts per_page=0, silently returning an empty page forever      │
+│ instead of rejecting the invalid input.                                      │
+│ victim/pagination.py::paginate   [boundary_condition]                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -23,5 +23,5 @@
+ def page_count(total, per_page):
+     """Number of pages needed to hold ``total`` items."""
+-    if per_page < 1:
++    if per_page < 0:
+         raise ValueError("per_page must be >= 1")
+     if total <= 0:
+
+╭──────────────────────────────── survivor 24 ─────────────────────────────────╮
+│ The page's reported total item count is the size of the current slice        │
+│ instead of the whole collection, so has_next/has_prev and downstream page    │
+│ counts silently become wrong once results span more than one page.           │
+│ victim/pagination.py::paginate   [other]                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -45,5 +45,5 @@
+         page=page,
+         per_page=per_page,
+-        total=len(items),
++        total=len(items[start:end]),
+     )
+ 
+
+╭──────────────────────────────── survivor 25 ─────────────────────────────────╮
+│ Durations with surrounding whitespace like ' 1h30m ' are rejected instead of │
+│ parsed, because the input is no longer trimmed before parsing.               │
+│ victim/parsing.py::parse_duration   [other]                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -12,5 +12,5 @@
+     if text is None:
+         raise ValueError("duration must not be None")
+-    text = text.strip().lower()
++    text = text.lower()
+     if not text:
+         raise ValueError("duration must not be empty")
+
+╭──────────────────────────────── survivor 26 ─────────────────────────────────╮
+│ A duration with a trailing number and no unit, like '1h30', silently drops   │
+│ the trailing amount instead of raising, so the parsed duration is smaller    │
+│ than what the caller wrote.                                                  │
+│ victim/parsing.py::parse_duration   [swallowed_error]                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -34,6 +34,4 @@
+             raise ValueError("unexpected character %r in %r" % (char, text))
+ 
+-    if number:
+-        raise ValueError("trailing number without a unit: %r" % text)
+     if not matched:
+         raise ValueError("no duration found in %r" % text)
+
+╭──────────────────────────────── survivor 27 ─────────────────────────────────╮
+│ A value that itself contains an '=' character, like 'a=b=c', crashes instead │
+│ of splitting on only the first '=' as documented.                            │
+│ victim/parsing.py::parse_key_values   [wrong_operator]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -58,5 +58,5 @@
+         if "=" not in segment:
+             raise ValueError("segment without '=': %r" % segment)
+-        key, value = segment.split("=", 1)
++        key, value = segment.split("=")
+         key = key.strip()
+         if not key:
+
+╭──────────────────────────────── survivor 28 ─────────────────────────────────╮
+│ Leading and trailing whitespace around values is preserved instead of        │
+│ stripped, so ' a = 1 ' keeps stray spaces in the parsed value.               │
+│ victim/parsing.py::parse_key_values   [other]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -62,5 +62,5 @@
+         if not key:
+             raise ValueError("segment with an empty key: %r" % segment)
+-        result[key] = value.strip()
++        result[key] = value
+     return result
+ 
+
+╭──────────────────────────────── survivor 29 ─────────────────────────────────╮
+│ When the same key appears twice, the first value silently wins instead of    │
+│ the later one overriding it as documented.                                   │
+│ victim/parsing.py::parse_key_values   [other]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -62,5 +62,6 @@
+         if not key:
+             raise ValueError("segment with an empty key: %r" % segment)
+-        result[key] = value.strip()
++        if key not in result:
++            result[key] = value.strip()
+     return result
+ 
+
+╭──────────────────────────────── survivor 30 ─────────────────────────────────╮
+│ A max_discount cap acts as a minimum instead of a maximum, so discounts      │
+│ meant to be capped can end up larger than intended.                          │
+│ victim/pricing.py::apply_discount   [wrong_operator]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -19,5 +19,5 @@
+     discount = price * percent / 100.0
+     if max_discount is not None:
+-        discount = min(discount, max_discount)
++        discount = max(discount, max_discount)
+ 
+     return round(price - discount, 2)
+
+╭──────────────────────────────── survivor 31 ─────────────────────────────────╮
+│ Passing percent=None, which is documented as 'no discount', instead applies  │
+│ a full 100% discount, making the item free.                                  │
+│ victim/pricing.py::apply_discount   [wrong_default]                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -13,5 +13,5 @@
+         raise ValueError("price must be >= 0")
+     if percent is None:
+-        percent = 0
++        percent = 100
+     if percent < 0 or percent > 100:
+         raise ValueError("percent must be between 0 and 100")
+
+╭──────────────────────────────── survivor 32 ─────────────────────────────────╮
+│ The discounted price is rounded to one decimal place instead of two cents of │
+│ precision, silently losing sub-cent accuracy that downstream billing code    │
+│ expects.                                                                     │
+│ victim/pricing.py::apply_discount   [other]                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -21,4 +21,4 @@
+         discount = min(discount, max_discount)
+ 
+-    return round(price - discount, 2)
++    return round(price - discount, 1)
+ 
+
+8 killed  32 survived
+14 LLM calls, 14 from cache (claude-opus-5)  ~$0.000  in 2.7s
+markdown report → 
+/var/folders/fx/rkfz5g5d5bggftkjvpvxp11c0000gn/T/mutagen-bench-afrslbet/victim/b
+ench.md
+json report → 
+/var/folders/fx/rkfz5g5d5bggftkjvpvxp11c0000gn/T/mutagen-bench-afrslbet/victim/b
+ench.json
+
+====================================================================
+mode              offline, model-written mutants from live_replies.json
+model             claude-opus-5
+mutants           40
+  killed            8   20.0%
+  survived         32   80.0%
+  timeout           0    0.0%
+  error             0    0.0%
+  unapplicable      0    0.0%
+mutation score    20.0%
+wall time         2.8s
+llm calls         14 (14 cached)
+cost              $0.0000
+golden standard   0/0 verdicts as predicted
+  (40 mutants had no prediction)
+====================================================================
+
+15 function(s) in 5 file(s) → up to 45 mutants, 15 LLM call(s) with 
+claude-opus-5
+
+
+
+╭──────────────────────────────────────────────────────╮
+│ mutation score  19%   (8 killed / 43 viable mutants) │
+╰──────────────────────────────────────────────────────╯
+
+file                  killed  survived  score
+victim/cache.py            4        13    24%
+victim/pagination.py       1        11     8%
+victim/parsing.py          1         5    17%
+victim/pricing.py          0         3     0%
+victim/text.py             2         3    40%
+
+35 bugs your tests would not catch
+
+╭───────────────────────────────── survivor 1 ─────────────────────────────────╮
+│ A cache created with capacity=0 is accepted instead of rejected, so callers  │
+│ get a cache that silently can never store anything.                          │
+│ victim/cache.py::LRUCache.__init__   [boundary_condition]                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -10,5 +10,5 @@
+ 
+     def __init__(self, capacity=128):
+-        if capacity < 1:
++        if capacity < 0:
+             raise ValueError("capacity must be >= 1")
+         self.capacity = capacity
+
+╭───────────────────────────────── survivor 2 ─────────────────────────────────╮
+│ The default cache capacity is smaller than documented (100 instead of 128),  │
+│ so callers relying on the default silently get less caching headroom and see │
+│ extra evictions.                                                             │
+│ victim/cache.py::LRUCache.__init__   [wrong_default]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -9,5 +9,5 @@
+     """Least-recently-used cache bounded by ``capacity`` entries."""
+ 
+-    def __init__(self, capacity=128):
++    def __init__(self, capacity=100):
+         if capacity < 1:
+             raise ValueError("capacity must be >= 1")
+
+╭───────────────────────────────── survivor 3 ─────────────────────────────────╮
+│ len(cache) undercounts by one, so callers relying on the reported size see   │
+│ one fewer entry than actually stored.                                        │
+│ victim/cache.py::LRUCache.__len__   [off_by_one]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return len(self._data) - 1
+ 
+     def get(self, key, default=None):
+
+╭───────────────────────────────── survivor 4 ─────────────────────────────────╮
+│ len(cache) always reports zero regardless of how many entries are stored,    │
+│ breaking any capacity or emptiness check based on it.                        │
+│ victim/cache.py::LRUCache.__len__   [other]                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return 0
+ 
+     def get(self, key, default=None):
+
+╭───────────────────────────────── survivor 5 ─────────────────────────────────╮
+│ len(cache) overcounts by one, so callers relying on the reported size see    │
+│ one more entry than actually stored.                                         │
+│ victim/cache.py::LRUCache.__len__   [off_by_one]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -18,5 +18,5 @@
+ 
+     def __len__(self):
+-        return len(self._data)
++        return len(self._data) + 1
+ 
+     def get(self, key, default=None):
+
+╭───────────────────────────────── survivor 6 ─────────────────────────────────╮
+│ Reading a key from the cache no longer marks it as recently used, so it can  │
+│ be evicted even though it was just accessed.                                 │
+│ victim/cache.py::LRUCache.get   [state_leak]                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -26,5 +26,4 @@
+             return default
+         self.hits += 1
+-        self._data.move_to_end(key)
+         return self._data[key]
+ 
+
+╭───────────────────────────────── survivor 7 ─────────────────────────────────╮
+│ A cache hit is recorded as a miss, so hit/miss statistics used for           │
+│ monitoring cache effectiveness are wrong.                                    │
+│ victim/cache.py::LRUCache.get   [other]                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -25,5 +25,5 @@
+             self.misses += 1
+             return default
+-        self.hits += 1
++        self.misses += 1
+         self._data.move_to_end(key)
+         return self._data[key]
+
+╭───────────────────────────────── survivor 8 ─────────────────────────────────╮
+│ The cache evicts one entry too early, dropping the least-recently-used item  │
+│ before the cache is actually full.                                           │
+│ victim/cache.py::LRUCache.set   [boundary_condition]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -34,5 +34,5 @@
+             self._data.move_to_end(key)
+         self._data[key] = value
+-        if len(self._data) > self.capacity:
++        if len(self._data) >= self.capacity:
+             self._data.popitem(last=False)
+ 
+
+╭───────────────────────────────── survivor 9 ─────────────────────────────────╮
+│ Overwriting an existing key's value does not refresh its recency, so it can  │
+│ be evicted as if it hadn't been touched recently.                            │
+│ victim/cache.py::LRUCache.set   [state_leak]                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -31,6 +31,4 @@
+     def set(self, key, value):
+         """Store ``value``, evicting the least-recently-used entry if full."""
+-        if key in self._data:
+-            self._data.move_to_end(key)
+         self._data[key] = value
+         if len(self._data) > self.capacity:
+
+╭──────────────────────────────── survivor 10 ─────────────────────────────────╮
+│ Invalidating a key that was never cached returns None instead of False, so   │
+│ callers checking the boolean result of invalidate() get an unexpected        │
+│ falsy-but-wrong value that can break stricter checks like `is False`.        │
+│ victim/cache.py::LRUCache.invalidate   [wrong_default]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -42,5 +42,5 @@
+             del self._data[key]
+             return True
+-        return False
++        return None
+ 
+     def invalidate_prefix(self, prefix):
+
+╭──────────────────────────────── survivor 11 ─────────────────────────────────╮
+│ invalidate_prefix reports how many keys it removed but never actually        │
+│ deletes them, so cached values keep being served after they should have been │
+│ invalidated.                                                                 │
+│ victim/cache.py::LRUCache.invalidate_prefix   [missing_invalidation]         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -47,6 +47,4 @@
+         """Drop every key starting with ``prefix``. Returns how many went."""
+         doomed = [key for key in self._data if key.startswith(prefix)]
+-        for key in doomed:
+-            del self._data[key]
+         return len(doomed)
+ 
+
+╭──────────────────────────────── survivor 12 ─────────────────────────────────╮
+│ invalidate_prefix matches keys by suffix instead of prefix, so it silently   │
+│ fails to invalidate the keys callers actually meant to clear and may clear   │
+│ unrelated ones.                                                              │
+│ victim/cache.py::LRUCache.invalidate_prefix   [wrong_operator]               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -46,5 +46,5 @@
+     def invalidate_prefix(self, prefix):
+         """Drop every key starting with ``prefix``. Returns how many went."""
+-        doomed = [key for key in self._data if key.startswith(prefix)]
++        doomed = [key for key in self._data if key.endswith(prefix)]
+         for key in doomed:
+             del self._data[key]
+
+╭──────────────────────────────── survivor 13 ─────────────────────────────────╮
+│ invalidate_prefix under-reports the number of keys removed by one, which     │
+│ throws off any caller (or logging/metrics) that relies on the count to       │
+│ confirm the right number of entries were cleared.                            │
+│ victim/cache.py::LRUCache.invalidate_prefix   [off_by_one]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/cache.py
++++ victim/cache.py (mutated)
+@@ -49,4 +49,4 @@
+         for key in doomed:
+             del self._data[key]
+-        return len(doomed)
++        return len(doomed) - 1
+ 
+
+╭──────────────────────────────── survivor 14 ─────────────────────────────────╮
+│ has_next stays true on the last page, so pagers try to fetch a page beyond   │
+│ the end of the data.                                                         │
+│ victim/pagination.py::Page.has_next   [boundary_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page <= page_count(self.total, self.per_page)
+ 
+     @property
+
+╭──────────────────────────────── survivor 15 ─────────────────────────────────╮
+│ has_next is backwards: it reports no next page while more pages remain, and  │
+│ reports a next page once you're past the end.                                │
+│ victim/pagination.py::Page.has_next   [inverted_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page > page_count(self.total, self.per_page)
+ 
+     @property
+
+╭──────────────────────────────── survivor 16 ─────────────────────────────────╮
+│ has_next computes the page count with the arguments swapped, producing a     │
+│ wildly wrong result whenever total and per_page differ, so pagination stops  │
+│ or continues at the wrong point.                                             │
+│ victim/pagination.py::Page.has_next   [argument_order]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -14,5 +14,5 @@
+     @property
+     def has_next(self):
+-        return self.page < page_count(self.total, self.per_page)
++        return self.page < page_count(self.per_page, self.total)
+ 
+     @property
+
+╭──────────────────────────────── survivor 17 ─────────────────────────────────╮
+│ has_prev reports true even on the first page, so pagers show a 'previous'    │
+│ control that leads nowhere.                                                  │
+│ victim/pagination.py::Page.has_prev   [boundary_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page >= 1
+ 
+ 
+
+╭──────────────────────────────── survivor 18 ─────────────────────────────────╮
+│ has_prev stays false on page 2 as well as page 1, so users can't navigate    │
+│ back to the second page.                                                     │
+│ victim/pagination.py::Page.has_prev   [off_by_one]                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page > 2
+ 
+ 
+
+╭──────────────────────────────── survivor 19 ─────────────────────────────────╮
+│ has_prev is inverted and is essentially always false, so the previous-page   │
+│ control never appears even when earlier pages exist.                         │
+│ victim/pagination.py::Page.has_prev   [inverted_condition]                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -18,5 +18,5 @@
+     @property
+     def has_prev(self):
+-        return self.page > 1
++        return self.page < 1
+ 
+ 
+
+╭──────────────────────────────── survivor 20 ─────────────────────────────────╮
+│ page_count silently drops the ceiling: 11 items at 5 per page reports 2      │
+│ pages instead of 3, so the last partial page of results is missed entirely.  │
+│ victim/pagination.py::page_count   [off_by_one]                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -27,5 +27,5 @@
+     if total <= 0:
+         return 0
+-    return (total + per_page - 1) // per_page
++    return total // per_page
+ 
+ 
+
+╭──────────────────────────────── survivor 21 ─────────────────────────────────╮
+│ page_count rejects a valid per_page of exactly 1, so callers who page one    │
+│ item at a time get an unexpected ValueError.                                 │
+│ victim/pagination.py::page_count   [boundary_condition]                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -23,5 +23,5 @@
+ def page_count(total, per_page):
+     """Number of pages needed to hold ``total`` items."""
+-    if per_page < 1:
++    if per_page <= 1:
+         raise ValueError("per_page must be >= 1")
+     if total <= 0:
+
+╭──────────────────────────────── survivor 22 ─────────────────────────────────╮
+│ Calling paginate() with items=None crashes instead of being treated as an    │
+│ empty result set.                                                            │
+│ victim/pagination.py::paginate   [none_handling]                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -32,6 +32,4 @@
+ def paginate(items, page=1, per_page=10):
+     """Return the ``page``-th slice of ``items`` (pages are 1-based)."""
+-    if items is None:
+-        items = []
+     if page < 1:
+         raise ValueError("page must be >= 1")
+
+╭──────────────────────────────── survivor 23 ─────────────────────────────────╮
+│ paginate() accepts per_page=0, silently returning an empty page forever      │
+│ instead of rejecting the invalid input.                                      │
+│ victim/pagination.py::paginate   [boundary_condition]                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -23,5 +23,5 @@
+ def page_count(total, per_page):
+     """Number of pages needed to hold ``total`` items."""
+-    if per_page < 1:
++    if per_page < 0:
+         raise ValueError("per_page must be >= 1")
+     if total <= 0:
+
+╭──────────────────────────────── survivor 24 ─────────────────────────────────╮
+│ The page's reported total item count is the size of the current slice        │
+│ instead of the whole collection, so has_next/has_prev and downstream page    │
+│ counts silently become wrong once results span more than one page.           │
+│ victim/pagination.py::paginate   [other]                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pagination.py
++++ victim/pagination.py (mutated)
+@@ -45,5 +45,5 @@
+         page=page,
+         per_page=per_page,
+-        total=len(items),
++        total=len(items[start:end]),
+     )
+ 
+
+╭──────────────────────────────── survivor 25 ─────────────────────────────────╮
+│ Durations with surrounding whitespace like ' 1h30m ' are rejected instead of │
+│ parsed, because the input is no longer trimmed before parsing.               │
+│ victim/parsing.py::parse_duration   [other]                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -12,5 +12,5 @@
+     if text is None:
+         raise ValueError("duration must not be None")
+-    text = text.strip().lower()
++    text = text.lower()
+     if not text:
+         raise ValueError("duration must not be empty")
+
+╭──────────────────────────────── survivor 26 ─────────────────────────────────╮
+│ A duration with a trailing number and no unit, like '1h30', silently drops   │
+│ the trailing amount instead of raising, so the parsed duration is smaller    │
+│ than what the caller wrote.                                                  │
+│ victim/parsing.py::parse_duration   [swallowed_error]                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -34,6 +34,4 @@
+             raise ValueError("unexpected character %r in %r" % (char, text))
+ 
+-    if number:
+-        raise ValueError("trailing number without a unit: %r" % text)
+     if not matched:
+         raise ValueError("no duration found in %r" % text)
+
+╭──────────────────────────────── survivor 27 ─────────────────────────────────╮
+│ A value that itself contains an '=' character, like 'a=b=c', crashes instead │
+│ of splitting on only the first '=' as documented.                            │
+│ victim/parsing.py::parse_key_values   [wrong_operator]                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -58,5 +58,5 @@
+         if "=" not in segment:
+             raise ValueError("segment without '=': %r" % segment)
+-        key, value = segment.split("=", 1)
++        key, value = segment.split("=")
+         key = key.strip()
+         if not key:
+
+╭──────────────────────────────── survivor 28 ─────────────────────────────────╮
+│ Leading and trailing whitespace around values is preserved instead of        │
+│ stripped, so ' a = 1 ' keeps stray spaces in the parsed value.               │
+│ victim/parsing.py::parse_key_values   [other]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -62,5 +62,5 @@
+         if not key:
+             raise ValueError("segment with an empty key: %r" % segment)
+-        result[key] = value.strip()
++        result[key] = value
+     return result
+ 
+
+╭──────────────────────────────── survivor 29 ─────────────────────────────────╮
+│ When the same key appears twice, the first value silently wins instead of    │
+│ the later one overriding it as documented.                                   │
+│ victim/parsing.py::parse_key_values   [other]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/parsing.py
++++ victim/parsing.py (mutated)
+@@ -62,5 +62,6 @@
+         if not key:
+             raise ValueError("segment with an empty key: %r" % segment)
+-        result[key] = value.strip()
++        if key not in result:
++            result[key] = value.strip()
+     return result
+ 
+
+╭──────────────────────────────── survivor 30 ─────────────────────────────────╮
+│ A max_discount cap acts as a minimum instead of a maximum, so discounts      │
+│ meant to be capped can end up larger than intended.                          │
+│ victim/pricing.py::apply_discount   [wrong_operator]                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -19,5 +19,5 @@
+     discount = price * percent / 100.0
+     if max_discount is not None:
+-        discount = min(discount, max_discount)
++        discount = max(discount, max_discount)
+ 
+     return round(price - discount, 2)
+
+╭──────────────────────────────── survivor 31 ─────────────────────────────────╮
+│ Passing percent=None, which is documented as 'no discount', instead applies  │
+│ a full 100% discount, making the item free.                                  │
+│ victim/pricing.py::apply_discount   [wrong_default]                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -13,5 +13,5 @@
+         raise ValueError("price must be >= 0")
+     if percent is None:
+-        percent = 0
++        percent = 100
+     if percent < 0 or percent > 100:
+         raise ValueError("percent must be between 0 and 100")
+
+╭──────────────────────────────── survivor 32 ─────────────────────────────────╮
+│ The discounted price is rounded to one decimal place instead of two cents of │
+│ precision, silently losing sub-cent accuracy that downstream billing code    │
+│ expects.                                                                     │
+│ victim/pricing.py::apply_discount   [other]                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/pricing.py
++++ victim/pricing.py (mutated)
+@@ -21,4 +21,4 @@
+         discount = min(discount, max_discount)
+ 
+-    return round(price - discount, 2)
++    return round(price - discount, 1)
+ 
+
+╭──────────────────────────────── survivor 33 ─────────────────────────────────╮
+│ Text exactly as long as the limit gets truncated and suffixed anyway instead │
+│ of being returned unchanged.                                                 │
+│ victim/text.py::truncate   [boundary_condition]                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/text.py
++++ victim/text.py (mutated)
+@@ -18,5 +18,5 @@
+     if text is None:
+         return ""
+-    if len(text) <= limit:
++    if len(text) < limit:
+         return text
+     if limit <= len(suffix):
+
+╭──────────────────────────────── survivor 34 ─────────────────────────────────╮
+│ When the limit is smaller than the suffix itself, truncate returns the full  │
+│ suffix instead of trimming it to fit, so the result can exceed the requested │
+│ limit.                                                                       │
+│ victim/text.py::truncate   [boundary_condition]                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/text.py
++++ victim/text.py (mutated)
+@@ -21,5 +21,5 @@
+         return text
+     if limit <= len(suffix):
+-        return suffix[:limit]
++        return suffix
+     return text[: limit - len(suffix)] + suffix
+ 
+
+╭──────────────────────────────── survivor 35 ─────────────────────────────────╮
+│ Truncated text is cut one character shorter than necessary before the suffix │
+│ is appended, silently discarding an extra character of content that would    │
+│ have fit within the limit.                                                   │
+│ victim/text.py::truncate   [off_by_one]                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- victim/text.py
++++ victim/text.py (mutated)
+@@ -22,4 +22,4 @@
+     if limit <= len(suffix):
+         return suffix[:limit]
+-    return text[: limit - len(suffix)] + suffix
++    return text[: limit - len(suffix) - 1] + suffix
+ 
+
+8 killed  35 survived
+15 LLM calls, 15 from cache (claude-opus-5)  ~$0.000  in 3.6s
+markdown report → 
+/var/folders/fx/rkfz5g5d5bggftkjvpvxp11c0000gn/T/mutagen-bench-erps55ny/victim/b
+ench.md
+json report → 
+/var/folders/fx/rkfz5g5d5bggftkjvpvxp11c0000gn/T/mutagen-bench-erps55ny/victim/b
+ench.json
+
+====================================================================
+mode              offline, model-written mutants from live_replies.json
+model             claude-opus-5
+mutants           43
+  killed            8   18.6%
+  survived         35   81.4%
+  timeout           0    0.0%
+  error             0    0.0%
+  unapplicable      0    0.0%
+mutation score    18.6%
+wall time         3.7s
+llm calls         15 (15 cached)
+cost              $0.0000
+golden standard   0/0 verdicts as predicted
+  (43 mutants had no prediction)
+====================================================================
