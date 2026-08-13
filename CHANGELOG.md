@@ -4,6 +4,32 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
+## 0.1.3 — 2026-08-14
+
+- **Fixed:** offline benchmark broken — `seed_cache()` key drifted from the
+  provider cache key (missing `max_tokens`, schema not serialized); the
+  benchmark now runs in CI to prevent drift.
+- **Fixed:** the GitHub Action gate no longer masks a mutagen crash (exit 1
+  without a valid report) as a green check.
+- **Fixed:** `mutagen --version` reported a stale hardcoded version; it is now
+  read from package metadata.
+- **Fixed:** the GitHub Action failed or silently misbehaved on shallow
+  clones — merge-base check now has an unshallow fallback.
+- **Added:** retry with exponential backoff (cap 30s, respects `Retry-After`)
+  on 429/5xx/network errors for OpenRouter.
+- **Added:** automatic default-branch detection (`origin/HEAD` → `main`/
+  `master`); `--base` documented for other cases.
+- **Added:** a warning when functions are skipped due to `--max-mutants`.
+- **Added:** dedup of identical SEARCH/REPLACE mutants within one LLM
+  response.
+- **`[security]`** cache files are now written with `0600` permissions;
+  the system prompt is hardened against instructions embedded in source
+  code.
+- **Docs:** comparison table with mutmut / cosmic-ray / Mutahunter; the
+  `--invent` claim softened; `error` verdict semantics documented; a
+  prices-as-of date added to markdown reports; README.en.md brought to
+  parity with README.md.
+
 ## 0.1.2 — 2026-08-14
 
 - **`[improvement]` Benchmarked against two independent third-party
