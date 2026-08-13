@@ -186,10 +186,13 @@ def test_missing_pytest_is_not_reported_as_a_red_suite(victim_repo, monkeypatch,
     # failing suite by exit code alone.
     bare = tmp_path / "bare"
     subprocess.run([sys.executable, "-m", "venv", str(bare)], check=True, capture_output=True)
+    bare_python = (
+        bare / "Scripts" / "python.exe" if sys.platform == "win32" else bare / "bin" / "python"
+    )
     seed(victim_repo, {"apply_discount": [SURVIVOR]})
     result = invoke(
         victim_repo,
-        ["run", "--all", "--workers", "1", "--python", str(bare / "bin" / "python")],
+        ["run", "--all", "--workers", "1", "--python", str(bare_python)],
         monkeypatch,
     )
     assert result.exit_code == 2
