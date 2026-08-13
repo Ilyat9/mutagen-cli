@@ -149,11 +149,19 @@ runs:
         set -e
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
 
-        if [ -f mutagen-report.json ]; then
+        # A crash (e.g. an unhandled exception, which Python also exits with
+        # code 1) must never be mistaken for the deliberate --fail-under exit
+        # 1. The report file is the only reliable signal: if it is missing or
+        # not valid JSON, the tool did not complete, no matter what the exit
+        # code says.
+        if [ -f mutagen-report.json ] && jq -e . mutagen-report.json >/dev/null 2>&1; then
+          echo "report-ok=true" >> "$GITHUB_OUTPUT"
           jq -r 'if .score == null then "score=" else "score=" + (.score * 100 | round | tostring) end' \
             mutagen-report.json >> "$GITHUB_OUTPUT"
           jq -r '"survivors=" + (.counts.survived // 0 | tostring)' \
             mutagen-report.json >> "$GITHUB_OUTPUT"
+        else
+          echo "report-ok=false" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Comment on the pull request
@@ -185,11 +193,20 @@ runs:
         INPUT_FAIL_UNDER: ${{ inputs.fail-under }}
         MUTATE_SCORE: ${{ steps.mutate.outputs.score }}
         MUTATE_EXIT_CODE: ${{ steps.mutate.outputs.exit-code }}
+        MUTATE_REPORT_OK: ${{ steps.mutate.outputs.report-ok }}
       run: |
         threshold="$INPUT_FAIL_UNDER"
         score="$MUTATE_SCORE"
         code="$MUTATE_EXIT_CODE"
 
+        # Checked first and independent of exit code: a crash exits 1 just
+        # like a deliberate --fail-under failure would, so the exit code
+        # alone cannot tell them apart. A missing/unparseable report means
+        # the tool did not finish, and that must never go green.
+        if [ "$MUTATE_REPORT_OK" != "true" ]; then
+          echo "::error::mutagen crashed or produced no report (exit $code) — see the 'Run mutagen' step's logs"
+          exit 1
+        fi
         if [ "$code" != "0" ] && [ "$code" != "1" ]; then
           echo "::error::mutagen failed to run (exit $code)"
           exit "$code"
