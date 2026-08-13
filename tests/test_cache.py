@@ -1,5 +1,10 @@
 """Cache directory / .gitignore hygiene."""
 
+import stat
+import sys
+
+import pytest
+
 from mutagen_cli.cache import Cache
 
 
@@ -43,3 +48,14 @@ def test_disabled_cache_does_not_create_or_touch_gitignore(tmp_path):
     Cache(tmp_path, enabled=False)
     assert not (tmp_path / ".mutagen").exists()
     assert not (tmp_path / ".gitignore").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
+def test_cache_entries_are_not_readable_by_other_users(tmp_path):
+    # The cache holds the user's own source (raw prompts/replies) — not safe
+    # to leave group/world readable on a shared host.
+    cache = Cache(tmp_path, enabled=True)
+    cache.put("some-key", {"data": "source code goes here"})
+    path = cache.dir / "some-key.json"
+    mode = stat.S_IMODE(path.stat().st_mode)
+    assert mode == 0o600

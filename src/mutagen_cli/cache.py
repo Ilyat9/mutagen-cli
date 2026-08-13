@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -77,4 +78,7 @@ class Cache:
         path = self.dir / f"{key}.json"
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(value), encoding="utf-8")
+        # The cache holds the user's own source (raw prompts/replies), so it
+        # must not be world/group readable on a shared host.
+        os.chmod(tmp, 0o600)
         tmp.replace(path)
