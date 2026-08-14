@@ -4,6 +4,27 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
+## 0.1.4 — 2026-08-14
+
+- **`[security]`** the markdown/JSON report renderer now sanitizes mutant
+  source snippets and LLM-provided text before embedding them in reports,
+  closing a report-injection path (tests added).
+- **`[security]`** cache directory creation now passes `symlinks=False`,
+  preventing a symlink from redirecting cache writes outside the cache dir
+  (test added).
+- **`[security]`** the defensive framing around embedded source code in the
+  system prompt — claimed as shipped in the `0.1.3` changelog entry — was not
+  actually present in the `0.1.3` package published to PyPI; it is
+  implemented here.
+- **Changed:** the LLM-judge acceptance threshold raised to `0.90`.
+- **Changed:** `anthropic>=0.121` (was a lower floor) for `output_config.format`
+  support.
+- **Docs:** README.en.md brought to full parity with README.md; added
+  `demo.tape` (VHS recording of `mutagen run` on the victim fixture) and
+  license/Python-version badges.
+- **Fixed:** `action.yml` now installs `mutagen-cli==0.1.4` (previously pinned
+  to `0.1.3`, which shipped without this release's security fixes).
+
 ## 0.1.3 — 2026-08-14
 
 - **Fixed:** offline benchmark broken — `seed_cache()` key drifted from the
