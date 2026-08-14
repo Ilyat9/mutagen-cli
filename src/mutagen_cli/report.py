@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,42 @@ from rich.text import Text
 
 from .models import ERROR, KILLED, SURVIVED, TIMEOUT, UNAPPLICABLE, Result, Usage
 from .provider import PRICES_DATE
+
+# Matches fenced ```...``` blocks or inline `...` spans, so sanitization can
+# skip over them: legitimate code inside a code span must survive unmodified,
+# an html tag or url written *as code* is not a rendering hazard.
+_CODE_SPAN_RE = re.compile(r"(```.*?```|`[^`\n]*`)", re.DOTALL)
+
+_DANGEROUS_TAGS = "script|img|iframe|embed|object|svg|input|form|button|meta|link|style"
+_OPEN_TAG_RE = re.compile(rf"<\s*({_DANGEROUS_TAGS})[^>]*>", re.IGNORECASE)
+_CLOSE_TAG_RE = re.compile(rf"</\s*({_DANGEROUS_TAGS})\s*>", re.IGNORECASE)
+_IMAGE_RE = re.compile(r"!\[.*?\]\(.*?\)")
+_BARE_URL_RE = re.compile(r"(^|\s)(https?://[^\s)>`\]]+)(?![)\]`])", re.MULTILINE)
+
+
+def _neutralize(text: str) -> str:
+    text = _IMAGE_RE.sub("", text)
+    text = _OPEN_TAG_RE.sub("", text)
+    text = _CLOSE_TAG_RE.sub("", text)
+    text = _BARE_URL_RE.sub(r"\1`\2`", text)
+    return text
+
+
+def sanitize_llm_text(text: str) -> str:
+    """Neutralize prompt-injection vectors in LLM-generated *prose* fields
+    (mutant descriptions, `--invent` explanations).
+
+    Prevents image-beacon injection ![x](http://...), inline HTML tags, and
+    bare URLs, while leaving normal markdown — bold, inline code, fenced code
+    blocks, relative links — untouched. Content inside a code span or fenced
+    block is skipped entirely: it is never applied to test source code, which
+    must reach the report byte-for-byte or a copied-out test would be wrong.
+    """
+    if not text:
+        return text
+
+    parts = _CODE_SPAN_RE.split(text)
+    return "".join(part if i % 2 else _neutralize(part) for i, part in enumerate(parts))
 
 
 @dataclass
@@ -255,7 +292,7 @@ def _render_footer(
 
 def _markdown_mutant(out: list[str], index: int, result: Result) -> None:
     mutant = result.mutant
-    out.append(f"### {index}. {mutant.description or mutant.id}\n")
+    out.append(f"### {index}. {sanitize_llm_text(mutant.description or mutant.id)}\n")
     out.append(f"`{mutant.target.label}` — _{mutant.bug_category}_\n")
     if result.diff:
         out.append("```diff")
@@ -371,7 +408,9 @@ def render_json(
                 "verdict": r.verdict,
                 "file": r.mutant.target.path,
                 "function": r.mutant.target.qualname,
-                "description": r.mutant.description,
+                "description": (
+                    sanitize_llm_text(r.mutant.description) if r.mutant.description else None
+                ),
                 "bug_category": r.mutant.bug_category,
                 "detail": r.detail,
                 "diff": r.diff,

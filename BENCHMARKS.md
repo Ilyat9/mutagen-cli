@@ -270,18 +270,19 @@ default.
   could verify whitespace against the source and self-correct; the raw model
   cannot. Opus-5's 3.0% is *better* than Run B's agent-assisted number.
 
-## Run E — pre-publication audit, 2026-08-13
+## Run E — pre-publication audit, 2026-08-14 (updated)
 
 An external re-check of everything above from a clean copy (fresh `rsync`
 without `.venv`/`.mutagen`/caches, new virtualenv, `pip install -e ".[dev]"`).
+Numbers updated 2026-08-14 after security fixes were merged.
 
 | Check | Result |
 | --- | --- |
-| Project test suite | **74 passed** (was 61 before the audit's regression tests) |
+| Project test suite | **133 passed** (was 74; added tests for prompt-injection hardening and report sanitization since the original audit) |
 | `ruff check .` | clean |
 | Run A reproduced | **28 mutants, 12/16, 42.9%, 28/28 golden verdicts** — identical |
 | Run B reproduced (`--replies benchmarks/data/live_replies.json`) | **43 mutants, 8/35, 18.6%, 0% unapplicable** — identical |
-| `mutagen run --all --dry-run` on mutagen itself | 94 functions in 13 files, plan printed, 9 calls quoted, nothing spent |
+| `mutagen run --all --dry-run` on mutagen itself | 119 functions in 14 files, plan printed, 9 calls quoted, nothing spent |
 | Live mini-run, OpenRouter, `--max-mutants 5` | 5 mutants, 0% unapplicable, 2 calls, **$0.014**, 14.7 s |
 | 3 hand-written must-die mutants through the CLI | all 3 `killed`, each naming its own failing test |
 | Live `--invent` on `victim/pricing.py` | 3 mutants, 2 `verified` suggested tests, 3 calls, **$0.016**, 33.1 s |

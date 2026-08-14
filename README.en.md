@@ -85,6 +85,42 @@ called). `--provider anthropic` talks to Anthropic directly instead of
 OpenRouter — that path is less battle-tested than OpenRouter (all our live
 runs so far went through OpenRouter); file an issue if you hit trouble there.
 
+## GitHub Action
+
+The `action.yml` workflow file in this repository is a mutation-testing gate for pull requests. It mutates only what changed in the PR and posts survivors as a comment, editing the same comment on each push instead of creating new ones.
+
+```yaml
+name: mutation
+on: pull_request
+
+jobs:
+  mutagen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .[dev]
+      - uses: Ilyat9/mutagen-cli@v0
+        with:
+          provider: openrouter
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
+          fail-under: "70"
+          invent: "true"
+```
+
+⚠️ **Important security note:** `pip install` executes code from the PR (setup.py, build hooks) in the runner's main process before mutagen has a chance to strip secrets, so for repositories that accept PRs from forks, you **must enable** "Require approval for first-time contributors" in Settings → Actions → General.
+
+**Critical:** Use only `pull_request` trigger as shown above. Never use `pull_request_target` with code checkout. `pull_request_target` runs with access to your repository's secrets, but it executes the PR's code — which you don't control. A fork PR can change anything the workflow runs, including the test suite itself, and exfiltrate `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or `GITHUB_TOKEN` before mutagen can strip them. This is a classic pwn request. The `pull_request` trigger doesn't have this vulnerability: it has no access to repository secrets when running on fork PRs.
+
+Tests from the PR run without secrets in the environment: mutagen strips `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, and `GITHUB_TOKEN` from the environment of each pytest subprocess, so untrusted test code cannot read them. This protects against malicious tests, but it is not a substitute for `pull_request_target` protection — always require approval for first-time contributors on fork PRs, just as you would for any CI that runs untrusted code.
+
 ## Limitations
 
 - **Python and pytest only.** Other languages and runners are not supported.
@@ -109,11 +145,11 @@ runs so far went through OpenRouter); file an issue if you hit trouble there.
   Each mutant's description and other report text is written by the model
   from the function's source (and, under `--invent`, its tests) — which may
   be code from someone else's PR. That text is posted into the markdown/JSON
-  report and the PR comment as-is, with no extra sanitization. A comment or
-  docstring in the PR crafted to look like an instruction to the model
-  (prompt injection) could in principle influence the wording in the report.
-  Keep that in mind when the Action runs on third-party PRs: the report is
-  text generated from untrusted input, not a statement from your CI system.
+  report and the PR comment with sanitization against prompt-injection vectors
+  (image-beacon syntax, HTML tags). However, a comment or docstring in the PR
+  crafted to influence the model could in principle change the wording in the
+  report. Keep that in mind when the Action runs on third-party PRs: the report
+  is text generated from untrusted input, not a statement from your CI system.
 - **Projects whose package only imports from site-packages** (e.g. with
   C extensions built at install time) aren't a fit yet: mutagen-cli puts the
   worker copy's sources ahead on `PYTHONPATH`, and the copy has no compiled

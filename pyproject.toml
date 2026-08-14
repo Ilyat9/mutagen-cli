@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "anthropic>=0.40",
+    "anthropic>=0.28",  # structured outputs with format and effort support
     "click>=8.1",
     "coverage>=7.0",
     "httpx>=0.24",
