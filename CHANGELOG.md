@@ -4,6 +4,15 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
+## 0.1.5 — 2026-08-15
+
+- **Fixed:** `action.yml` now pins `mutagen-cli==0.1.5` (previously pinned
+  `0.1.4`, but tagged before that fix landed, so the published Action
+  lagged the security fixes for a full release cycle).
+- **Docs:** demo GIF embedded under the tagline in README.md/README.en.md;
+  `demo.tape` VHS recording of `mutagen run` against the victim fixture
+  added.
+
 ## 0.1.4 — 2026-08-14
 
 - **`[security]`** the markdown/JSON report renderer now sanitizes mutant
