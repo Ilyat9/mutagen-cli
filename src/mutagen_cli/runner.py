@@ -64,7 +64,9 @@ def _ignore(directory, names):
 
 
 def prepare_workspace(root: Path, dest: Path) -> None:
-    shutil.copytree(root, dest, ignore=_ignore, symlinks=True)
+    # symlinks=False: copy symlink targets rather than links themselves to prevent
+    # sandbox escape (symlinks pointing outside the repo boundary would break isolation).
+    shutil.copytree(root, dest, ignore=_ignore, symlinks=False)
 
 
 def run_pytest(

@@ -367,3 +367,29 @@ def test_pytest_subprocess_does_not_see_mutagens_secrets(victim_repo, tmp_path, 
     )
     code, output, _ = run_pytest(workdir, sys.executable, ["tests/test_probe_env.py"], 30.0)
     assert code == 0, output
+
+
+def test_symlinks_are_copied_as_content_not_links(tmp_path):
+    # Regression: symlinks=True in shutil.copytree allows sandbox escape via
+    # symlinks pointing outside the repo. Ensure symlinks are copied as content.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "src").mkdir()
+    (repo / "src" / "code.py").write_text("x = 1")
+
+    # Create a file outside the repo
+    outside = tmp_path / "outside_file.txt"
+    outside.write_text("secret")
+
+    # Create a symlink inside repo pointing to outside file
+    (repo / "src" / "link_to_secret").symlink_to(outside)
+
+    # Copy workspace
+    workdir = tmp_path / "worker"
+    prepare_workspace(repo, workdir)
+
+    # The symlink should be copied as content (a file), not as a link
+    copied_link = workdir / "src" / "link_to_secret"
+    assert copied_link.exists()
+    assert not copied_link.is_symlink(), "Symlink was not converted to content"
+    assert copied_link.read_text() == "secret"
