@@ -9,6 +9,8 @@ Full version (Russian): [README.md](README.md)
 
 **Your tests are green. Here's what they don't catch.**
 
+![mutagen demo](assets/demo.gif)
+
 mutagen-cli introduces realistic bugs into your code — off-by-one errors, missed
 cache invalidation, swapped arguments, inverted conditions — and reruns your
 test suite. Any bug that survives is a gap in your tests, reported as the
