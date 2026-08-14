@@ -17,7 +17,9 @@ import difflib
 from dataclasses import dataclass
 from typing import Optional
 
-DEFAULT_THRESHOLD = 0.85
+# Fuzzy matching threshold: 0.90+ reduces misplacement risk in functions with
+# repeated blocks (e.g., multiple error handlers with similar code patterns).
+DEFAULT_THRESHOLD = 0.90
 
 
 @dataclass
