@@ -9,7 +9,9 @@ Full version (Russian): [README.md](README.md)
 
 **Your tests are green. Here's what they don't catch.**
 
-![mutagen demo](assets/demo.gif)
+![Ninja turtles in a sewer: ALL TESTS GREEN... but one got away](assets/mutagen_cli.gif)
+
+![Real run: 3 bugs found in 1.4 seconds, $0.00 from cache](assets/demo.gif)
 
 mutagen-cli introduces realistic bugs into your code — off-by-one errors, missed
 cache invalidation, swapped arguments, inverted conditions — and reruns your
