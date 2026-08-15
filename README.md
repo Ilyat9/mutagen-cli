@@ -9,9 +9,15 @@
 
 **Ваши тесты зелёные. Вот что они не проверяют.**
 
-![Черепашки-ниндзя в канализации: ALL TESTS GREEN... but one got away](assets/mutagen_cli.gif)
+<p align="center">
+  <img src="assets/mutagen_cli.gif" alt="Черепашки-ниндзя в канализации: ALL TESTS GREEN... but one got away" width="700">
+</p>
 
-![Реальный прогон: 3 бага найдены за 1.4 секунды, $0.00 из кэша](assets/demo.gif)
+---
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Реальный прогон: 3 бага найдены за 1.4 секунды, $0.00 из кэша" width="700">
+</p>
 
 mutagen-cli подсаживает в код правдоподобные баги — off-by-one, забытую
 инвалидацию кэша, перепутанные аргументы, инвертированные условия — и
