@@ -23,7 +23,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import shutil
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -164,6 +166,49 @@ def run_mutagen(
     return json.loads(out.read_text()), elapsed, proc.stdout
 
 
+def bootstrap_ci(values: list[float], resamples: int = 10000, seed: int = 20260815):
+    """Percentile bootstrap 95% CI of the mean. Seeded, so the printed
+    interval reproduces exactly."""
+    rng = random.Random(seed)
+    n = len(values)
+    means = sorted(
+        sum(rng.choice(values) for _ in range(n)) / n for _ in range(resamples)
+    )
+    return means[int(0.025 * resamples)], means[int(0.975 * resamples)]
+
+
+def one_run(args, source: Path | None) -> tuple[dict, float, str, dict[str, str]]:
+    """Full benchmark cycle in a fresh temp repo: cold cache in live mode."""
+    tmp = Path(tempfile.mkdtemp(prefix="mutagen-bench-"))
+    try:
+        repo = make_repo(tmp)
+        expected = (
+            {}
+            if args.live
+            else seed_cache(repo, args.provider, args.model, args.effort,
+                            args.max_mutants, source or CANNED)
+        )
+        report, elapsed, stdout = run_mutagen(
+            repo, args.provider, args.model, args.effort, args.invent, args.max_mutants
+        )
+        return report, elapsed, stdout, expected
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def golden_agreement(report: dict, expected: dict[str, str]) -> tuple[int, int, int]:
+    agree = disagree = unknown = 0
+    for mutant in report["mutants"]:
+        want = expected.get(mutant["id"].split("-")[0])
+        if not want:
+            unknown += 1
+        elif want == mutant["verdict"]:
+            agree += 1
+        else:
+            disagree += 1
+    return agree, disagree, unknown
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--live", action="store_true", help="Call the real API.")
@@ -180,86 +225,118 @@ def main() -> None:
         help="Copy the JSON report here before the temp repo is cleaned up.",
     )
     parser.add_argument(
-        "--replies", default=None,
+        "--replies", nargs="+", default=None,
         help="JSON of model-written replies keyed by target label, seeded into the "
              "cache instead of the canned set. Measures real mutant quality with "
-             "no API calls.",
+             "no API calls. With --runs N, pass N files (one per run) or one file "
+             "reused for every run.",
+    )
+    parser.add_argument(
+        "--runs", type=int, default=1,
+        help="Repeat the full cycle N times in fresh temp repos and report the "
+             "spread plus a bootstrap CI of the mean score.",
     )
     args = parser.parse_args()
 
     args.model = args.model or default_model(args.provider)
     if args.live and args.replies:
         raise SystemExit("--live and --replies are mutually exclusive")
+    if args.runs < 1:
+        raise SystemExit("--runs must be >= 1")
+    if args.replies and len(args.replies) not in (1, args.runs):
+        raise SystemExit(
+            f"--replies takes 1 file or exactly --runs files, got {len(args.replies)}"
+        )
     # Spending money must be an explicit act. Inferring it from a key that
     # happens to be exported (the README tells you to export one) would bill
     # anyone who runs the "offline, zero API calls" command from the README.
     live = args.live
     if live and not os.environ.get(ENV_KEYS[args.provider]):
         raise SystemExit(f"--live needs {ENV_KEYS[args.provider]} in the environment")
-    source = Path(args.replies) if args.replies else CANNED
-    tmp = Path(tempfile.mkdtemp(prefix="mutagen-bench-"))
-    try:
-        repo = make_repo(tmp)
-        expected = (
-            {} if live
-            else seed_cache(repo, args.provider, args.model, args.effort, args.max_mutants, source)
-        )
-        report, elapsed, stdout = run_mutagen(
-            repo, args.provider, args.model, args.effort, args.invent, args.max_mutants
-        )
-        if args.save_report:
-            Path(args.save_report).write_text(json.dumps(report, indent=2), encoding="utf-8")
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
 
-    print(stdout)
-    counts = report["counts"]
+    sources: list[Path | None] = (
+        [Path(args.replies[i if len(args.replies) > 1 else 0]) for i in range(args.runs)]
+        if args.replies
+        else [None] * args.runs
+    )
+
+    runs = []
+    for source in sources:
+        report, elapsed, stdout, expected = one_run(args, source)
+        runs.append({"report": report, "elapsed": elapsed, "stdout": stdout,
+                     "expected": expected})
+
+    if args.save_report:
+        payload = [r["report"] for r in runs] if args.runs > 1 else runs[0]["report"]
+        Path(args.save_report).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    print(runs[-1]["stdout"])
+    counts = runs[-1]["report"]["counts"]
     total = sum(counts.values())
     print("=" * 68)
     if live:
         mode = "live (real API calls)"
     elif args.replies:
-        mode = f"offline, model-written mutants from {Path(args.replies).name}"
+        mode = f"offline, model-written mutants from {Path(args.replies[-1]).name}"
     else:
         mode = "offline (canned mutants)"
     print(f"mode              {mode}")
     print(f"provider          {args.provider}")
-    print(f"model             {report['model']}")
+    print(f"model             {runs[-1]['report']['model']}")
     print(f"mutants           {total}")
     for verdict in ("killed", "survived", "timeout", "error", "unapplicable"):
         value = counts.get(verdict, 0)
         share = f"{value / total * 100:5.1f}%" if total else "    -"
         print(f"  {verdict:<15} {value:>3}  {share}")
-    score = report["score"]
+    score = runs[-1]["report"]["score"]
     print(f"mutation score    {score * 100:.1f}%" if score is not None else "mutation score    n/a")
-    print(f"wall time         {elapsed:.1f}s")
-    usage = report["usage"]
+    print(f"wall time         {runs[-1]['elapsed']:.1f}s")
+    usage = runs[-1]["report"]["usage"]
     print(f"llm calls         {usage['calls']} ({usage['cached_calls']} cached)")
     print(f"tokens            {usage['input_tokens']} in / {usage['output_tokens']} out")
     if usage.get("unpriced_calls"):
-        print(f"cost              unavailable (no price known for {report['model']})")
+        print(f"cost              unavailable (no price known for {runs[-1]['report']['model']})")
     else:
         print(f"cost              ${usage['cost_usd']:.4f}")
 
+    expected = runs[-1]["expected"]
     if expected:
-        agree = disagree = unknown = 0
-        rows = []
-        for mutant in report["mutants"]:
-            key = mutant["id"].split("-")[0]
-            want = expected.get(key)
-            got = mutant["verdict"]
-            if not want:
-                unknown += 1
-            elif want == got:
-                agree += 1
-            else:
-                disagree += 1
-                rows.append(f"    {key}: expected {want}, got {got}")
+        agree, disagree, unknown = golden_agreement(runs[-1]["report"], expected)
         print(f"golden standard   {agree}/{agree + disagree} verdicts as predicted")
-        for row in rows:
-            print(row)
+        if disagree:
+            want_by_key = expected
+            for mutant in runs[-1]["report"]["mutants"]:
+                key = mutant["id"].split("-")[0]
+                want = want_by_key.get(key)
+                if want and want != mutant["verdict"]:
+                    print(f"    {key}: expected {want}, got {mutant['verdict']}")
         if unknown:
             print(f"  ({unknown} mutants had no prediction)")
+
+    if args.runs > 1:
+        print("-" * 68)
+        print(f"spread over {args.runs} runs")
+        print(f"  {'run':>3}  {'mutants':>7}  {'killed':>6}  "
+              f"{'survived':>8}  {'score':>6}  {'wall':>6}")
+        scores = []
+        for i, run in enumerate(runs, 1):
+            c = run["report"]["counts"]
+            t = sum(c.values())
+            s = run["report"]["score"]
+            scores.append(s)
+            print(f"  {i:>3}  {t:>7}  {c.get('killed', 0):>6}  "
+                  f"{c.get('survived', 0):>8}  "
+                  f"{(f'{s * 100:.1f}%' if s is not None else 'n/a'):>6}  "
+                  f"{run['elapsed']:>5.1f}s")
+        valid = [s for s in scores if s is not None]
+        if valid:
+            mean = statistics.fmean(valid)
+            sd = statistics.stdev(valid) if len(valid) > 1 else 0.0
+            lo, hi = bootstrap_ci(valid)
+            print(f"  mean score      {mean * 100:.1f}% ± {sd * 100:.1f}% (sd)")
+            print(f"  spread          {min(valid) * 100:.1f}%..{max(valid) * 100:.1f}%")
+            print(f"  bootstrap 95% CI of the mean: [{lo * 100:.1f}%, {hi * 100:.1f}%]  "
+                  f"(10k resamples, seeded)")
     print("=" * 68)
 
 

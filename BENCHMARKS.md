@@ -473,6 +473,103 @@ worse error message or a rare double-counting bug.
   the target repo's actual test suite, not an automated check — the same
   standard applied to every other run in this file.
 
+## Run H — run-to-run spread, bootstrap CI, 2026-08-15
+
+Every number above is a point estimate from a single generation. This run puts
+an interval on the one that matters most — the mutation score.
+
+Method: the 15 prompts were answered **five times independently** (offline,
+same subagent-as-provider pattern as Run B, no API calls), and each reply set
+was fed through the production pipeline with a cold cache:
+
+```bash
+python scripts/benchmark.py --runs 5 --max-mutants 50 \
+    --replies benchmarks/data/bootstrap/replies_{1..5}.json
+```
+
+(`benchmark.py` gained `--runs N` for this: each run executes in a fresh temp
+repo, so a live `--runs N` would be N cold-cache generations. The spread
+summary prints a seeded percentile-bootstrap 95% CI of the mean.)
+
+| Run | Mutants | killed | survived | Score |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 27 | 1 | 26 | 3.7% |
+| 2 | 24 | 1 | 23 | 4.2% |
+| 3 | 22 | 2 | 20 | 9.1% |
+| 4 | 24 | 0 | 24 | 0.0% |
+| 5 | 24 | 2 | 22 | 8.3% |
+
+**Mean 5.1% ± 3.7% (sd); spread 0.0–9.1%; bootstrap 95% CI of the mean
+[2.2%, 7.9%].** The engine contributes zero variance: the canned run repeated
+5× is byte-identical (42.9% every time, 28/28 golden verdicts), so everything
+in that interval is generation variance.
+
+Caveats, stated plainly:
+
+- The five generations came from the **same model in the same session** (an
+  agent answering the dumped prompts), so this interval *understates* the true
+  across-session, across-model spread. It is a floor on the noise, not the
+  noise. A live `--runs 5` with a real key remains the honest version of this
+  measurement.
+- The absolute level is not comparable to Run B's 18.6%: these reply sets were
+  written by an agent instructed to aim at blind spots, and it aimed well.
+  What the run measures is the *spread*, not the level.
+
+## Run I — equivalent-mutant classifier, calibrated, 2026-08-15
+
+`mutagen run --classify-survivors` adds a second opinion to every survivor: a
+judge prompt (`JUDGE_SYSTEM` in `src/mutagen_cli/prompts.py`) asks the strict
+question — *is there NO reachable input for which observable behaviour
+differs?* — and the answer lands on the report as an annotation. The verdict
+and the score do not move; this is the same convention as `no_coverage`. The
+approach follows Tian et al., ["Large Language Models for Equivalent Mutant
+Detection: How Far Are We?"](https://2024.issta.org/details/issta-2024-papers/138/Large-Language-Models-for-Equivalent-Mutant-Detection-How-Far-Are-We-)
+(ISSTA 2024), here with the calibration they call for done against our own
+hand labels.
+
+Gold set: `benchmarks/data/equivalence_gold.json` — all **99 survivors** from
+Runs B and D, each labelled by hand on two axes: `equivalent` (strict; 3
+positives) and `junk` (the weaker "no reasonable test would assert on this";
+7 positives, a superset). Labels are keyed by mutant id and quote the manual
+read from the Run B/D tables above.
+
+```bash
+python scripts/eval_equivalence.py --dump-prompts benchmarks/data/judge_prompts/
+# a judge answered all 99 prompts into benchmarks/data/judge_replies.json
+python scripts/eval_equivalence.py --replies benchmarks/data/judge_replies.json
+# or, with a key: python scripts/eval_equivalence.py --live --provider openrouter
+```
+
+| | |
+| --- | --- |
+| Gold set | 99 survivors: 3 equivalent, 7 junk |
+| Judge flagged equivalent | 3 |
+| tp / fp / fn / tn | 3 / 0 / 0 / 96 |
+| **Precision** | **100%** (3/3) |
+| **Recall** | **100%** (3/3) |
+| Junk axis (informational) | 3/7 hand-labelled junk flagged equivalent |
+
+The four junk-but-not-equivalent survivors (two changed defaults,
+`None` instead of `False`, the negative-`total` boundary) were correctly
+*not* flagged: the strict question does what it says, and a default change is
+distinguishable by filling the cache past the default. The 3/7 on the junk
+axis is not a miss — the judge was never asked the weaker question.
+
+### Caveats — read these before quoting the 100%s
+
+- **Circularity.** No API key was available for this run, so the 99 judge
+  answers were produced offline by the same model (and session) that
+  transcribed the hand labels into the gold set. Agreement is therefore
+  inflated by construction; treat this as a harness check plus evidence the
+  strict prompt *can* separate the classes, not as an independent measurement.
+  `eval_equivalence.py --live` exists for the honest version.
+- **Three positives.** Recall on 3 examples quantizes to thirds: one missed
+  equivalent is 67%, two is 33%. The ISSTA baseline reports on thousands of
+  mutants; this set cannot support that kind of claim.
+- **Polygon only.** Run G survivors (parse, parsy) are excluded — their
+  sources live outside this repository, and a gold label is only credible
+  against the real function text.
+
 ## Determinism
 
 - LLM responses are cached on disk under `.mutagen/cache/`, keyed on
@@ -483,6 +580,7 @@ worse error message or a rare double-counting bug.
   the current Anthropic models), so run-to-run variation on a cold cache is
   whatever the model produces at `effort=medium`. A live benchmark should be
   quoted with its cache directory retained, or run several times and reported as
-  a range.
+  a range — see Run H for the measured offline version of that range
+  (`--runs N`).
 - The polygon is frozen. Changing `victim/` or its tests invalidates every
   number above.

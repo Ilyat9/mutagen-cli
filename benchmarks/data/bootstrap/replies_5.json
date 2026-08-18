@@ -1,0 +1,204 @@
+{
+  "victim/cache.py::LRUCache.__init__": {
+    "mutants": [
+      {
+        "description": "The miss counter starts at 1 instead of 0, so every cache reports a miss that never happened.",
+        "bug_category": "state_leak",
+        "search_block": "        self.misses = 0",
+        "replace_block": "        self.misses = 1"
+      },
+      {
+        "description": "A cache created with capacity=1 is rejected, so single-entry caches cannot be constructed at all.",
+        "bug_category": "boundary_condition",
+        "search_block": "        if capacity < 1:",
+        "replace_block": "        if capacity < 2:"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.__len__": {
+    "mutants": [
+      {
+        "description": "len(cache) reports one entry fewer than the cache actually holds.",
+        "bug_category": "off_by_one",
+        "search_block": "        return len(self._data)",
+        "replace_block": "        return len(self._data) - 1"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.get": {
+    "mutants": [
+      {
+        "description": "Every cache miss counts the miss counter backwards, so miss statistics go negative.",
+        "bug_category": "wrong_operator",
+        "search_block": "            self.misses += 1",
+        "replace_block": "            self.misses -= 1"
+      },
+      {
+        "description": "Reading a key marks it as the oldest entry instead of the newest, so hot entries are evicted first.",
+        "bug_category": "wrong_operator",
+        "search_block": "        self._data.move_to_end(key)",
+        "replace_block": "        self._data.move_to_end(key, last=False)"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.set": {
+    "mutants": [
+      {
+        "description": "Overwriting an existing key silently keeps the old value, so updates are lost.",
+        "bug_category": "wrong_operator",
+        "search_block": "        self._data[key] = value",
+        "replace_block": "        self._data.setdefault(key, value)"
+      },
+      {
+        "description": "Overwriting an existing key no longer refreshes its recency, so recently-updated entries are evicted as stale.",
+        "bug_category": "missing_invalidation",
+        "search_block": "        if key in self._data:\n            self._data.move_to_end(key)",
+        "replace_block": "        if key in self._data:\n            pass"
+      }
+    ]
+  },
+  "victim/cache.py::LRUCache.invalidate": {
+    "mutants": []
+  },
+  "victim/cache.py::LRUCache.invalidate_prefix": {
+    "mutants": [
+      {
+        "description": "The count returned by invalidate_prefix is one less than the number of entries actually removed.",
+        "bug_category": "off_by_one",
+        "search_block": "        return len(doomed)",
+        "replace_block": "        return len(doomed) - 1"
+      },
+      {
+        "description": "Prefix invalidation also removes keys that merely contain the prefix in the middle, deleting unrelated entries.",
+        "bug_category": "wrong_operator",
+        "search_block": "        doomed = [key for key in self._data if key.startswith(prefix)]",
+        "replace_block": "        doomed = [key for key in self._data if prefix in key]"
+      }
+    ]
+  },
+  "victim/pagination.py::Page.has_next": {
+    "mutants": [
+      {
+        "description": "The last page claims a next page exists, so UIs render a 'next' button that leads to an empty page.",
+        "bug_category": "boundary_condition",
+        "search_block": "        return self.page < page_count(self.total, self.per_page)",
+        "replace_block": "        return self.page <= page_count(self.total, self.per_page)"
+      }
+    ]
+  },
+  "victim/pagination.py::Page.has_prev": {
+    "mutants": []
+  },
+  "victim/pagination.py::page_count": {
+    "mutants": [
+      {
+        "description": "Page counts round down instead of up, so the final partially-filled page is dropped and trailing items become unreachable.",
+        "bug_category": "off_by_one",
+        "search_block": "    return (total + per_page - 1) // per_page",
+        "replace_block": "    return total // per_page"
+      },
+      {
+        "description": "per_page=0 no longer raises a clear error and instead blows up with a raw ZeroDivisionError.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if per_page < 1:",
+        "replace_block": "    if per_page < 0:"
+      }
+    ]
+  },
+  "victim/pagination.py::paginate": {
+    "mutants": [
+      {
+        "description": "The page number stored on the result is one less than requested, so page 1 is reported as page 0 and navigation highlights break.",
+        "bug_category": "off_by_one",
+        "search_block": "        page=page,",
+        "replace_block": "        page=page - 1,"
+      },
+      {
+        "description": "Requesting per_page=1 is rejected as invalid, so single-item pages cannot be served.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if per_page < 1:\n        raise ValueError(\"per_page must be >= 1\")",
+        "replace_block": "    if per_page < 2:\n        raise ValueError(\"per_page must be >= 1\")"
+      }
+    ]
+  },
+  "victim/parsing.py::parse_duration": {
+    "mutants": [
+      {
+        "description": "Durations written with uppercase units like '1H30M' are rejected instead of parsed.",
+        "bug_category": "other",
+        "search_block": "    text = text.strip().lower()",
+        "replace_block": "    text = text.strip()"
+      },
+      {
+        "description": "Only the last unit group is counted, so '1h30m' parses as 30 minutes and the hours are dropped.",
+        "bug_category": "state_leak",
+        "search_block": "            total += int(number) * _UNIT_SECONDS[char]",
+        "replace_block": "            total = int(number) * _UNIT_SECONDS[char]"
+      }
+    ]
+  },
+  "victim/parsing.py::parse_key_values": {
+    "mutants": [
+      {
+        "description": "Values that themselves contain '=' like 'query=a=b' now crash the parser instead of being kept intact.",
+        "bug_category": "other",
+        "search_block": "        key, value = segment.split(\"=\", 1)",
+        "replace_block": "        key, value = segment.split(\"=\")"
+      },
+      {
+        "description": "Keys keep their surrounding whitespace, so 'a =1' and 'a=1' become two different keys.",
+        "bug_category": "other",
+        "search_block": "        key = key.strip()",
+        "replace_block": "        key = key"
+      }
+    ]
+  },
+  "victim/pricing.py::apply_discount": {
+    "mutants": [
+      {
+        "description": "A max_discount of 0 is ignored, so 'cap the discount at zero' lets the full discount through.",
+        "bug_category": "none_handling",
+        "search_block": "    if max_discount is not None:",
+        "replace_block": "    if max_discount:"
+      },
+      {
+        "description": "Results are rounded to four decimal places instead of two, so prices carry sub-cent fractions.",
+        "bug_category": "boundary_condition",
+        "search_block": "    return round(price - discount, 2)",
+        "replace_block": "    return round(price - discount, 4)"
+      },
+      {
+        "description": "A 100% discount is rejected as out of range, so 'make it free' promotions cannot be applied.",
+        "bug_category": "boundary_condition",
+        "search_block": "    if percent < 0 or percent > 100:",
+        "replace_block": "    if percent < 0 or percent >= 100:"
+      }
+    ]
+  },
+  "victim/text.py::normalize_whitespace": {
+    "mutants": [
+      {
+        "description": "Runs of spaces are no longer collapsed and tabs or newlines are left untouched, so messy input stays messy.",
+        "bug_category": "other",
+        "search_block": "    return \" \".join(text.split())",
+        "replace_block": "    return \" \".join(text.split(\" \"))"
+      }
+    ]
+  },
+  "victim/text.py::truncate": {
+    "mutants": [
+      {
+        "description": "When the limit is shorter than the suffix, the result exceeds the limit instead of fitting inside it.",
+        "bug_category": "boundary_condition",
+        "search_block": "        return suffix[:limit]",
+        "replace_block": "        return suffix"
+      },
+      {
+        "description": "Truncated text comes out one character shorter than the limit allows, clipping a character that would have fit.",
+        "bug_category": "off_by_one",
+        "search_block": "    return text[: limit - len(suffix)] + suffix",
+        "replace_block": "    return text[: limit - len(suffix) - 1] + suffix"
+      }
+    ]
+  }
+}
