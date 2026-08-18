@@ -241,3 +241,38 @@ def test_installed_entry_point_runs():
     )
     assert proc.returncode == 0
     assert "mutagen" in proc.stdout
+
+
+def test_classify_survivors_annotates_the_report(victim_repo, monkeypatch, tmp_path):
+    from mutagen_cli.models import Mutant
+    from mutagen_cli.prompts import JUDGE_SCHEMA, JUDGE_SYSTEM, judge_user
+
+    seed(victim_repo, {"apply_discount": [SURVIVOR]})
+    # Seed the judge's cache key too, or the classification pass tries to call out.
+    target = next(
+        t for t in collect_targets(victim_repo, all_files=True)
+        if t.qualname == "apply_discount"
+    )
+    mutant = Mutant(target=target, **SURVIVOR, index=1)
+    cache = Cache(victim_repo, enabled=True)
+    cache.put(
+        Cache.key(
+            "openrouter", MODEL, reasoning_tag(False), "16000",
+            JUDGE_SYSTEM, judge_user(target, mutant),
+            json.dumps(JUDGE_SCHEMA, sort_keys=True),
+        ),
+        {"data": {"equivalent": True, "reason": "min and max coincide here"}},
+    )
+
+    js = tmp_path / "r.json"
+    result = invoke(
+        victim_repo,
+        ["run", "--all", "--workers", "1", "--python", sys.executable,
+         "--classify-survivors", "--report-json", str(js)],
+        monkeypatch,
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(js.read_text())
+    judged = payload["mutants"][0]
+    assert judged["equivalent"] is True
+    assert judged["equivalence_reason"] == "min and max coincide here"

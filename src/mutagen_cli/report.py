@@ -194,6 +194,8 @@ def _render_survivor(
     body.append(mutant.description or "(no description)", style="bold")
     body.append(f"\n{mutant.target.label}", style="dim")
     body.append(f"   [{mutant.bug_category}]", style="cyan")
+    if result.equivalent:
+        body.append("   [likely equivalent — no input distinguishes it]", style="yellow")
 
     console.print()
     console.print(
@@ -294,6 +296,11 @@ def _markdown_mutant(out: list[str], index: int, result: Result) -> None:
     mutant = result.mutant
     out.append(f"### {index}. {sanitize_llm_text(mutant.description or mutant.id)}\n")
     out.append(f"`{mutant.target.label}` — _{mutant.bug_category}_\n")
+    if result.equivalent:
+        out.append(
+            "**Likely an equivalent mutant** — the classifier found no reachable "
+            f"input that distinguishes it: {sanitize_llm_text(result.equivalence_reason)}\n"
+        )
     if result.diff:
         out.append("```diff")
         out.append(result.diff)
@@ -418,6 +425,8 @@ def render_json(
                 "suggested_test": r.invented_test,
                 "suggested_test_status": r.invented_test_status,
                 "no_coverage": r.no_coverage,
+                "equivalent": r.equivalent,
+                "equivalence_reason": r.equivalence_reason or None,
             }
             for r in results
         ],

@@ -1,0 +1,999 @@
+{
+  "labels": {
+    "equivalent": "no reachable input makes observable behaviour differ (strict)",
+    "junk": "equivalent, or mutates something no reasonable test would assert on",
+    "source": "hand labels from BENCHMARKS.md Runs B and D; every survivor re-read by hand"
+  },
+  "survivors": [
+    {
+      "report": "live_report",
+      "id": "LRUCache.__init__#1-9dcd3d4c",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "A cache created with capacity=0 is accepted instead of rejected, so callers get a cache that silently can never store anything.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.__init__#2-e1de0e55",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "The default cache capacity is smaller than documented (100 instead of 128), so callers relying on the default silently get less caching headroom and see extra evictions.",
+      "equivalent": false,
+      "junk": true,
+      "note": "Changes a default nobody pins with a test (capacity 128 -> 100)."
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.__len__#1-16036d8b",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) undercounts by one, so callers relying on the reported size see one fewer entry than actually stored.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.__len__#2-e7f27c0a",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) always reports zero regardless of how many entries are stored, breaking any capacity or emptiness check based on it.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.__len__#3-07b4ae7c",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) overcounts by one, so callers relying on the reported size see one more entry than actually stored.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.get#1-a4c98832",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "Reading a key from the cache no longer marks it as recently used, so it can be evicted even though it was just accessed.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.get#2-08ba6c9f",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "A cache hit is recorded as a miss, so hit/miss statistics used for monitoring cache effectiveness are wrong.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.set#1-26c8edd3",
+      "file": "victim/cache.py",
+      "function": "LRUCache.set",
+      "description": "The cache evicts one entry too early, dropping the least-recently-used item before the cache is actually full.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.set#2-36e95518",
+      "file": "victim/cache.py",
+      "function": "LRUCache.set",
+      "description": "Overwriting an existing key's value does not refresh its recency, so it can be evicted as if it hadn't been touched recently.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.invalidate#1-f24f58ef",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate",
+      "description": "Invalidating a key that was never cached returns None instead of False, so callers checking the boolean result of invalidate() get an unexpected falsy-but-wrong value that can break stricter checks like `is False`.",
+      "equivalent": false,
+      "junk": true,
+      "note": "Returns None instead of False for an absent key; violates the contract but only an `is False` check distinguishes it. Counted as junk, conservative."
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.invalidate_prefix#1-d5644bfa",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "invalidate_prefix reports how many keys it removed but never actually deletes them, so cached values keep being served after they should have been invalidated.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.invalidate_prefix#2-9448ca3c",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "invalidate_prefix matches keys by suffix instead of prefix, so it silently fails to invalidate the keys callers actually meant to clear and may clear unrelated ones.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "LRUCache.invalidate_prefix#3-534d089d",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "invalidate_prefix under-reports the number of keys removed by one, which throws off any caller (or logging/metrics) that relies on the count to confirm the right number of entries were cleared.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "Page.has_next#1-d3af5a65",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next stays true on the last page, so pagers try to fetch a page beyond the end of the data.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "Page.has_next#2-56134900",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next is backwards: it reports no next page while more pages remain, and reports a next page once you're past the end.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "Page.has_next#3-f357b0e8",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next computes the page count with the arguments swapped, producing a wildly wrong result whenever total and per_page differ, so pagination stops or continues at the wrong point.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "Page.has_prev#1-85a99e73",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "has_prev reports true even on the first page, so pagers show a 'previous' control that leads nowhere.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "Page.has_prev#2-6df9f75a",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "has_prev stays false on page 2 as well as page 1, so users can't navigate back to the second page.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "Page.has_prev#3-03c74eeb",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "has_prev is inverted and is essentially always false, so the previous-page control never appears even when earlier pages exist.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "page_count#1-d996dca4",
+      "file": "victim/pagination.py",
+      "function": "page_count",
+      "description": "page_count silently drops the ceiling: 11 items at 5 per page reports 2 pages instead of 3, so the last partial page of results is missed entirely.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "page_count#2-96ebe89f",
+      "file": "victim/pagination.py",
+      "function": "page_count",
+      "description": "page_count rejects a valid per_page of exactly 1, so callers who page one item at a time get an unexpected ValueError.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "paginate#1-49b272ee",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "Calling paginate() with items=None crashes instead of being treated as an empty result set.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "paginate#2-ccd25f84",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "paginate() accepts per_page=0, silently returning an empty page forever instead of rejecting the invalid input.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "paginate#3-cd71852b",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "The page's reported total item count is the size of the current slice instead of the whole collection, so has_next/has_prev and downstream page counts silently become wrong once results span more than one page.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "parse_duration#1-7af0763d",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "Durations with surrounding whitespace like ' 1h30m ' are rejected instead of parsed, because the input is no longer trimmed before parsing.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "parse_duration#2-df68f194",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "A duration with a trailing number and no unit, like '1h30', silently drops the trailing amount instead of raising, so the parsed duration is smaller than what the caller wrote.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "parse_key_values#1-ea698d02",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "A value that itself contains an '=' character, like 'a=b=c', crashes instead of splitting on only the first '=' as documented.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "parse_key_values#2-179f51f6",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "Leading and trailing whitespace around values is preserved instead of stripped, so ' a = 1 ' keeps stray spaces in the parsed value.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "parse_key_values#3-edd9ffd6",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "When the same key appears twice, the first value silently wins instead of the later one overriding it as documented.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "apply_discount#1-575432b0",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "A max_discount cap acts as a minimum instead of a maximum, so discounts meant to be capped can end up larger than intended.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "apply_discount#2-30906661",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "Passing percent=None, which is documented as 'no discount', instead applies a full 100% discount, making the item free.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "apply_discount#3-196363d5",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "The discounted price is rounded to one decimal place instead of two cents of precision, silently losing sub-cent accuracy that downstream billing code expects.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "truncate#1-c97e6406",
+      "file": "victim/text.py",
+      "function": "truncate",
+      "description": "Text exactly as long as the limit gets truncated and suffixed anyway instead of being returned unchanged.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "truncate#2-757752ff",
+      "file": "victim/text.py",
+      "function": "truncate",
+      "description": "When the limit is smaller than the suffix itself, truncate returns the full suffix instead of trimming it to fit, so the result can exceed the requested limit.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_report",
+      "id": "truncate#3-2496aff4",
+      "file": "victim/text.py",
+      "function": "truncate",
+      "description": "Truncated text is cut one character shorter than necessary before the suffix is appended, silently discarding an extra character of content that would have fit within the limit.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.__init__#1-6c74e7c7",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "The default capacity boundary check allows capacity of 0 to silently pass validation logic when capacity is set below 1 via a boundary flip, causing an off-by-one on the minimum allowed capacity so capacity=1 is wrongly rejected.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.__init__#2-88ec5910",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "Hit and miss counters start at 1 instead of 0, so freshly created caches report inflated hit/miss statistics before any access occurs.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.__init__#3-ba456dd6",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "The default capacity is silently changed from 128 to 1, so caches created without an explicit capacity evict everything after the very first insert.",
+      "equivalent": false,
+      "junk": true,
+      "note": "Default capacity 128 -> 1; changes a default nobody pins (Run B precedent)."
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.__len__#1-16036d8b",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) always returns one less than the actual number of entries stored",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.__len__#2-e7f27c0a",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) always returns zero regardless of how many items are stored",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.get#1-8675129b",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "Reading a value from the cache no longer refreshes its recency, so recently-accessed items can still be evicted before less-recently-used ones.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.get#2-92009d0c",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "Every cache lookup, hit or miss, is counted as a hit, so hit/miss statistics become meaningless.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.set#1-36e95518",
+      "file": "victim/cache.py",
+      "function": "LRUCache.set",
+      "description": "Setting a value for a key that already exists no longer refreshes its recency, so it can be evicted as if it were the oldest entry even though it was just updated.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.invalidate#1-3f0bb1ac",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate",
+      "description": "invalidate() reports success even when the key was never present, since it always returns True regardless of whether a deletion happened",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.invalidate#2-c87ccd91",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate",
+      "description": "invalidate() removes the key from storage but leaves it in the LRU order tracking, so stale key references can linger and affect eviction ordering",
+      "equivalent": true,
+      "junk": true,
+      "note": "del d[key] -> d.pop(key): binary-identical on an OrderedDict."
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.invalidate_prefix#1-792e83f1",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "invalidate_prefix always reports zero removals regardless of how many keys were actually deleted, so callers relying on the count get wrong information",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.invalidate_prefix#2-d5644bfa",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "invalidate_prefix silently does nothing (removes no keys) but still reports a truthy-looking count based on matches found before deletion is skipped",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "LRUCache.invalidate_prefix#3-8eab9098",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "invalidate_prefix only removes keys that exactly match the prefix elsewhere in the string rather than keys starting with it, so prefix-based invalidation of nested namespaces silently fails",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "Page.has_next#1-d3af5a65",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next incorrectly reports True on the last page because it treats the current page as still having more pages until it exceeds the count by one",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "Page.has_next#2-4f6eb10d",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next always returns False, so callers never see a next-page indicator even when more pages exist",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "Page.has_next#3-77b35d6d",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next is inverted, reporting no next page when one exists and vice versa",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "Page.has_prev#1-85a99e73",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "On the first page, has_prev incorrectly reports True instead of False, suggesting there is a previous page when there isn't.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "Page.has_prev#2-64d5eeb5",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "has_prev always returns False, so the UI never shows a 'previous page' link even when one exists.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "Page.has_prev#3-b1df608c",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "has_prev is inverted, returning True only on the first page and False everywhere else.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "page_count#2-cca852d6",
+      "file": "victim/pagination.py",
+      "function": "page_count",
+      "description": "page_count silently returns 0 for negative totals instead of treating them as invalid, masking upstream bugs that pass a negative count.",
+      "equivalent": false,
+      "junk": true,
+      "note": "total <= 0 -> total < 0: observable only for negative totals, a degenerate input."
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "page_count#3-cb7ea687",
+      "file": "victim/pagination.py",
+      "function": "page_count",
+      "description": "Calling page_count with per_page exactly 1 now incorrectly raises a ValueError even though 1 is a valid page size.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "paginate#2-0ab5d843",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "The 'total' count reported on a page is always one less than the true number of items, making has_next and other calculations based on total slightly wrong.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "parse_duration#1-14b26451",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "Duration strings with a trailing number but no unit (e.g. '1h30') silently succeed instead of raising an error, returning only the hours portion",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "parse_duration#2-62ae71ff",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "Whitespace-only input like a string of spaces is treated as empty before stripping is checked, but leading/trailing whitespace inside mixed durations like '1h 30m' now silently drops the space instead of raising, changing which strings are accepted vs rejected inconsistently",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "parse_duration#3-8459b1c0",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "Passing an empty string after stripping (e.g. all-whitespace input) no longer raises immediately and instead falls through, eventually raising a different, less specific error about no duration found",
+      "equivalent": true,
+      "junk": true,
+      "note": "Both variants raise ValueError on empty input; only the message text differs."
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "parse_key_values#1-179f51f6",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "Values are no longer stripped of surrounding whitespace, so keys like 'a' end up mapped to ' 1' instead of '1'.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "parse_key_values#2-106fdca4",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "An empty input string now returns None instead of an empty dict, breaking any caller that iterates or does membership checks on the result.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "parse_key_values#3-4ed90f53",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "When the same key appears multiple times, the first occurrence wins instead of the last, contradicting the documented override behavior.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "apply_discount#1-e6e4615b",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "The discount cap is ignored when the computed discount is smaller than max_discount, effectively swapping which value is used as the cap versus the actual discount, so discounts can exceed the intended maximum in some cases.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "apply_discount#2-8c300571",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "Negative percent values are silently accepted instead of raising an error, since the boundary check no longer rejects them.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_sonnet5",
+      "id": "apply_discount#3-30906661",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "Passing percent=None now raises an error instead of being treated as no discount, breaking callers that rely on this documented fallback behavior.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.__init__#1-fe591ba5",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "A capacity of 0 is accepted instead of rejected, creating a cache that can never usefully hold anything.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.__init__#3-74ba6f80",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__init__",
+      "description": "Hit counter starts at one instead of zero, so hit statistics are always inflated.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.__len__#1-aec2ebcd",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) reports one fewer item than the cache actually holds.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.__len__#2-93abda31",
+      "file": "victim/cache.py",
+      "function": "LRUCache.__len__",
+      "description": "len(cache) always reports zero regardless of how many entries are stored.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.get#1-bc9097c6",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "Reading a key no longer refreshes its recency, so recently-read entries are evicted first.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.get#2-90419fbe",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "A cache miss is counted as a hit, corrupting hit/miss statistics.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.get#3-0dbb54ff",
+      "file": "victim/cache.py",
+      "function": "LRUCache.get",
+      "description": "Successful lookups are not counted as hits, so the hit counter stays at zero.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.set#1-7e5c2bc1",
+      "file": "victim/cache.py",
+      "function": "LRUCache.set",
+      "description": "Overwriting an existing key does not mark it as recently used, so a freshly updated entry can be evicted before older ones.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.set#3-26c8edd3",
+      "file": "victim/cache.py",
+      "function": "LRUCache.set",
+      "description": "The cache evicts an entry as soon as it reaches capacity, so it only ever holds capacity-1 items.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.invalidate#1-d8d5e5ad",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate",
+      "description": "Invalidating a key that isn't in the cache reports success instead of failure.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.invalidate_prefix#1-79433109",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "Invalidating by prefix reports one fewer key removed than it actually dropped.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.invalidate_prefix#2-f040606b",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "Invalidating by prefix leaves the first matching key in the cache, so stale values keep being served.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "LRUCache.invalidate_prefix#3-da01f0a3",
+      "file": "victim/cache.py",
+      "function": "LRUCache.invalidate_prefix",
+      "description": "Invalidating by prefix also drops keys that merely contain the prefix anywhere, wiping unrelated entries.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "Page.has_next#1-d3af5a65",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next stays true on the final page, so callers keep requesting a page that does not exist.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "Page.has_next#2-a26c6a45",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next is computed from the item count instead of the page count, so it is true for almost every page.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "Page.has_next#3-ca3286ea",
+      "file": "victim/pagination.py",
+      "function": "Page.has_next",
+      "description": "has_next reports whether there is a previous page instead of a next one.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "Page.has_prev#1-85a99e73",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "The first page incorrectly reports that a previous page exists.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "Page.has_prev#2-c6d97239",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "Pages after the first report that no previous page exists, and page 1 falsely reports one.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "Page.has_prev#3-6df9f75a",
+      "file": "victim/pagination.py",
+      "function": "Page.has_prev",
+      "description": "Page 2 incorrectly reports that there is no previous page.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "page_count#1-d996dca4",
+      "file": "victim/pagination.py",
+      "function": "page_count",
+      "description": "Partial final pages are dropped, so a partly-filled last page of items becomes unreachable (11 items at 5 per page reports 2 pages instead of 3).",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "page_count#2-96ebe89f",
+      "file": "victim/pagination.py",
+      "function": "page_count",
+      "description": "A per_page of 1 is rejected as invalid instead of being accepted.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "paginate#1-9dfb0967",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "Pages after the first start one item too early, so each page repeats the last item of the previous page.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "paginate#2-68ff65b8",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "The reported total counts only the items on the current page instead of the whole collection, so page counts and has_next are wrong.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "paginate#3-4e78aadc",
+      "file": "victim/pagination.py",
+      "function": "paginate",
+      "description": "Requesting per_page=0 is silently accepted and returns an empty page instead of raising an error.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "parse_duration#1-7af0763d",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "Whitespace is no longer stripped from the input, so durations with surrounding spaces are rejected as invalid characters.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "parse_duration#2-74e6e33c",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "A trailing number without a unit is silently ignored instead of raising an error, so \"1h30\" parses as one hour.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "parse_duration#3-abfc61d2",
+      "file": "victim/parsing.py",
+      "function": "parse_duration",
+      "description": "Empty input returns zero instead of raising a ValueError.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "parse_key_values#2-87a134bd",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "Earlier occurrences of a duplicate key win instead of the last one overriding.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "parse_key_values#3-be09a2ad",
+      "file": "victim/parsing.py",
+      "function": "parse_key_values",
+      "description": "Values keep their surrounding whitespace instead of being stripped.",
+      "equivalent": true,
+      "junk": true,
+      "note": "Adds a redundant value.strip('\\n'); the value is fully stripped two lines later."
+    },
+    {
+      "report": "live_opus5",
+      "id": "apply_discount#1-575432b0",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "The discount cap is ignored and instead the larger of the computed discount and the cap is applied, so capped discounts overcharge the customer's savings.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "apply_discount#2-c07c705c",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "A percent of None is treated as a full 100% discount instead of no discount.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "apply_discount#3-4202d261",
+      "file": "victim/pricing.py",
+      "function": "apply_discount",
+      "description": "A percent of exactly 100 is rejected as out of range instead of applying a full discount.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    },
+    {
+      "report": "live_opus5",
+      "id": "normalize_whitespace#1-036ed960",
+      "file": "victim/text.py",
+      "function": "normalize_whitespace",
+      "description": "Falsy values other than None (like empty strings or 0) are turned into empty strings instead of being normalized normally.",
+      "equivalent": false,
+      "junk": false,
+      "note": ""
+    }
+  ]
+}

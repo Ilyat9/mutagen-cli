@@ -14,6 +14,7 @@ from rich.text import Text
 
 from . import __version__, coverage_map
 from .cache import Cache
+from .equivalence import classify_survivors as judge_survivors
 from .generator import estimate, generate
 from .invent import invent
 from .models import SURVIVED, Usage
@@ -95,6 +96,9 @@ def main() -> None:
               help="Write a test for each surviving mutant.")
 @click.option("--invent-apply", is_flag=True,
               help="Also save verified suggested tests into tests/mutagen_generated/.")
+@click.option("--classify-survivors", is_flag=True,
+              help="Ask the model whether each surviving mutant is an equivalent "
+                   "mutant; the verdict is annotated on the report.")
 @click.option("--report-md", type=click.Path(), default=None)
 @click.option("--report-json", type=click.Path(), default=None)
 @click.option("--no-cache", is_flag=True, help="Ignore the on-disk LLM cache.")
@@ -103,8 +107,8 @@ def main() -> None:
               help="Exit non-zero if the mutation score is below this percentage.")
 def run(
     base, all_files, paths, max_mutants, max_files, timeout, workers, provider, model,
-    effort, python_bin, invent_flag, invent_apply, report_md, report_json, no_cache,
-    dry_run, fail_under,
+    effort, python_bin, invent_flag, invent_apply, classify_survivors, report_md,
+    report_json, no_cache, dry_run, fail_under,
 ) -> None:
     """Generate mutants, run the tests against them, report the survivors."""
     started = time.monotonic()
@@ -273,6 +277,7 @@ def run(
             root, targets, cfg, tmp, base_workdir, coverage,
             provider=provider, model=model, effort=effort, no_cache=no_cache,
             max_mutants=max_mutants, want_invent=want_invent, invent_apply=invent_apply,
+            want_classify=classify_survivors,
         )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -305,6 +310,7 @@ def run(
 def _generate_and_run(
     root, targets, cfg, tmp, base_workdir, coverage, *,
     provider, model, effort, no_cache, max_mutants, want_invent, invent_apply,
+    want_classify,
 ):
     """Generate mutants, run them, optionally invent tests. Returns (results, usage)."""
     cache = Cache(root, enabled=not no_cache)
@@ -396,6 +402,23 @@ def _generate_and_run(
                 )
             usage.add(inv_usage)
             for warning in inv_warnings:
+                console.print(Text(warning, style="dim"))
+
+    # --- equivalence classification ---------------------------------------------
+    if want_classify:
+        judged = sum(1 for r in results if r.verdict == SURVIVED and not r.no_coverage)
+        if judged:
+            with Progress(
+                SpinnerColumn(), TextColumn("{task.description}"), BarColumn(),
+                TextColumn("{task.completed}/{task.total}"), TimeElapsedColumn(),
+                console=console, transient=True,
+            ) as progress:
+                task = progress.add_task("judging survivors for equivalence", total=judged)
+                cls_usage, cls_warnings = judge_survivors(
+                    results, llm, on_progress=lambda _r: progress.advance(task),
+                )
+            usage.add(cls_usage)
+            for warning in cls_warnings:
                 console.print(Text(warning, style="dim"))
 
     return results, usage

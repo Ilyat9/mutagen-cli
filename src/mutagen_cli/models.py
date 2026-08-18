@@ -71,6 +71,11 @@ class Result:
     # stronger finding than a survivor that ran: no test could ever have
     # caught it, because no test reaches the code.
     no_coverage: bool = False
+    # Set by --classify-survivors (equivalence.py). None means the judge never
+    # ran; True means the model judged this survivor an equivalent mutant —
+    # an annotation on the report, not a verdict: the score does not move.
+    equivalent: Optional[bool] = None
+    equivalence_reason: str = ""
 
 
 @dataclass

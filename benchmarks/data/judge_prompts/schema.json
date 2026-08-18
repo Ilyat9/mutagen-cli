@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "equivalent": {
+      "type": "boolean",
+      "description": "True only if NO reachable input can make the mutated function behave observably differently from the original."
+    },
+    "reason": {
+      "type": "string",
+      "description": "One sentence. For an equivalent mutant, why no input can distinguish it. Otherwise, a concrete input that would."
+    }
+  },
+  "required": [
+    "equivalent",
+    "reason"
+  ],
+  "additionalProperties": false
+}

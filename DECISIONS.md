@@ -267,6 +267,45 @@ than called uncovered: "never imported" and "excluded by a source filter" look
 identical from here, and guessing wrong in that direction would invent blind
 spots that do not exist.
 
+## D12 — Equivalence is a judge annotation, not a verdict
+
+**Problem.** Some survivors are equivalent mutants — no reachable input can
+distinguish them from the original — and counting them as "bugs your tests
+would not catch" overstates the findings. Runs B and D labelled them by hand;
+that does not scale past a benchmark.
+
+**A (current).** A second LLM pass (`--classify-survivors`,
+`equivalence.py`) asks the strict question — *is there NO reachable input for
+which observable behaviour differs?* — and annotates the survivor on the
+report. The verdict and the score do not move, the same convention as
+`no_coverage`.
+
+**B.** Filter judged-equivalent mutants out of the score entirely.
+
+**C.** No judge; keep the hand-labelling discipline from BENCHMARKS.md.
+
+**Recommendation: A.** B lets the model that wrote the mutant also erase it
+from the denominator — the incentive gradient points the wrong way, and a
+miscalibrated judge would silently inflate every score. C does not survive
+contact with a 200-survivor report. A keeps the machine answer visible and
+the human number untouched, and it gives us something measurable: the judge's
+precision/recall against the hand labels is itself a benchmark (Run I).
+
+**Consequences accepted:**
+
+- **The judge asks only the strict question.** The weaker "no reasonable test
+  would assert on this" axis stays hand-labelled; conflating the two would
+  make the classifier's calibration numbers uninterpretable (Run I reports
+  the axes separately).
+- **Unreached survivors are not judged.** "No test runs this" already says
+  everything; equivalence of unreachable code is a question nobody asked.
+- **The calibration gold set is the polygon only.** Run G's targets live
+  outside this repository, and a label is only credible against the real
+  function text.
+
+**New annotation: `equivalent`.** `None` means the judge never ran — distinct
+from `false`, so "not classified" never reads as "judged real".
+
 ---
 
 ## Post-MVP ideas

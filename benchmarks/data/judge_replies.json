@@ -1,0 +1,358 @@
+{
+  "LRUCache.__init__#1-9dcd3d4c": {
+    "equivalent": false,
+    "reason": "LRUCache(0): original raises ValueError, mutated constructs a cache."
+  },
+  "LRUCache.__init__#2-e1de0e55": {
+    "equivalent": false,
+    "reason": "LRUCache() filled past 100 entries: mutated evicts at 100 instead of 128."
+  },
+  "LRUCache.__len__#1-16036d8b": {
+    "equivalent": false,
+    "reason": "Any non-empty cache: len() differs by one."
+  },
+  "LRUCache.__len__#2-e7f27c0a": {
+    "equivalent": false,
+    "reason": "Any non-empty cache: len() is 0 instead of the entry count."
+  },
+  "LRUCache.__len__#3-07b4ae7c": {
+    "equivalent": false,
+    "reason": "Any non-empty cache: len() differs by one."
+  },
+  "LRUCache.get#1-a4c98832": {
+    "equivalent": false,
+    "reason": "Fill to capacity, read the oldest key, insert: original keeps the read key, mutated evicts it."
+  },
+  "LRUCache.get#2-08ba6c9f": {
+    "equivalent": false,
+    "reason": "One successful read: hits stays 0 and misses is 2 in the mutated version."
+  },
+  "LRUCache.set#1-26c8edd3": {
+    "equivalent": false,
+    "reason": "Fill exactly to capacity: mutated evicts one insert early."
+  },
+  "LRUCache.set#2-36e95518": {
+    "equivalent": false,
+    "reason": "Overwrite the oldest key at capacity, then insert: original keeps it, mutated evicts it."
+  },
+  "LRUCache.invalidate#1-f24f58ef": {
+    "equivalent": false,
+    "reason": "invalidate(absent): original returns False, mutated returns None \u2014 distinguishable by `is False`."
+  },
+  "LRUCache.invalidate_prefix#1-d5644bfa": {
+    "equivalent": false,
+    "reason": "Any matching key: mutated reports removals but deletes nothing."
+  },
+  "LRUCache.invalidate_prefix#2-9448ca3c": {
+    "equivalent": false,
+    "reason": "Keys 'xa'/'ax' with prefix 'a': startswith and endswith select different sets."
+  },
+  "LRUCache.invalidate_prefix#3-534d089d": {
+    "equivalent": false,
+    "reason": "Any deletion: returned count is one less than the number removed."
+  },
+  "Page.has_next#1-d3af5a65": {
+    "equivalent": false,
+    "reason": "Last page: mutated reports has_next True."
+  },
+  "Page.has_next#2-56134900": {
+    "equivalent": false,
+    "reason": "First of several pages: mutated reports has_next False."
+  },
+  "Page.has_next#3-f357b0e8": {
+    "equivalent": false,
+    "reason": "Swapped arguments to page_count give a wrong page total for total != per_page."
+  },
+  "Page.has_prev#1-85a99e73": {
+    "equivalent": false,
+    "reason": "Page 1: mutated reports has_prev True."
+  },
+  "Page.has_prev#2-6df9f75a": {
+    "equivalent": false,
+    "reason": "Page 2: mutated reports has_prev False."
+  },
+  "Page.has_prev#3-03c74eeb": {
+    "equivalent": false,
+    "reason": "Page 2: mutated reports has_prev False."
+  },
+  "page_count#1-d996dca4": {
+    "equivalent": false,
+    "reason": "page_count(11, 5): floor division reports 2 pages instead of 3."
+  },
+  "page_count#2-96ebe89f": {
+    "equivalent": false,
+    "reason": "page_count(10, 1): mutated raises ValueError."
+  },
+  "paginate#1-49b272ee": {
+    "equivalent": false,
+    "reason": "paginate(None): original returns an empty page, mutated raises TypeError."
+  },
+  "paginate#2-ccd25f84": {
+    "equivalent": false,
+    "reason": "paginate(items, per_page=0): original raises ValueError, mutated raises ZeroDivisionError."
+  },
+  "paginate#3-cd71852b": {
+    "equivalent": false,
+    "reason": "paginate(range(10), per_page=3).total: 3 instead of 10."
+  },
+  "parse_duration#1-7af0763d": {
+    "equivalent": false,
+    "reason": "parse_duration(' 1h '): original strips and parses, mutated raises on the space."
+  },
+  "parse_duration#2-df68f194": {
+    "equivalent": false,
+    "reason": "parse_duration('1h30'): original raises, mutated returns 3630."
+  },
+  "parse_key_values#1-ea698d02": {
+    "equivalent": false,
+    "reason": "parse_key_values('a=b=c'): original keeps 'b=c', mutated raises ValueError on unpack."
+  },
+  "parse_key_values#2-179f51f6": {
+    "equivalent": false,
+    "reason": "parse_key_values('a= 1 '): value keeps its spaces in the mutated version."
+  },
+  "parse_key_values#3-edd9ffd6": {
+    "equivalent": false,
+    "reason": "parse_key_values('a=1;a=2'): mutated keeps the first value instead of the last."
+  },
+  "apply_discount#1-575432b0": {
+    "equivalent": false,
+    "reason": "apply_discount(100, 50, max_discount=10): mutated inflates the discount to 50."
+  },
+  "apply_discount#2-30906661": {
+    "equivalent": false,
+    "reason": "apply_discount(100, None): mutated returns 0.0 instead of 100.0."
+  },
+  "apply_discount#3-196363d5": {
+    "equivalent": false,
+    "reason": "apply_discount(10.005, 33): rounding to one decimal changes the cents."
+  },
+  "truncate#1-c97e6406": {
+    "equivalent": false,
+    "reason": "truncate('abcdefghij', 10): original returns the text, mutated cuts and suffixes it."
+  },
+  "truncate#2-757752ff": {
+    "equivalent": false,
+    "reason": "truncate('hello', 2): mutated returns '...' (3 chars), exceeding the limit."
+  },
+  "truncate#3-2496aff4": {
+    "equivalent": false,
+    "reason": "truncate('abcdefghijklmnop', 10): result is 9 chars instead of 10."
+  },
+  "LRUCache.__init__#1-6c74e7c7": {
+    "equivalent": false,
+    "reason": "LRUCache(1): original constructs a one-entry cache, mutated raises ValueError."
+  },
+  "LRUCache.__init__#2-88ec5910": {
+    "equivalent": false,
+    "reason": "A fresh cache reports hits=1, misses=1 before any access."
+  },
+  "LRUCache.__init__#3-ba456dd6": {
+    "equivalent": false,
+    "reason": "LRUCache() with two inserts: mutated evicts at capacity 1 instead of 128."
+  },
+  "LRUCache.get#1-8675129b": {
+    "equivalent": false,
+    "reason": "Fill to capacity, read the oldest key, insert: original keeps the read key, mutated evicts it."
+  },
+  "LRUCache.get#2-92009d0c": {
+    "equivalent": false,
+    "reason": "One miss: mutated increments hits as well as misses."
+  },
+  "LRUCache.set#1-36e95518": {
+    "equivalent": false,
+    "reason": "Overwrite the oldest key at capacity, then insert: original keeps it, mutated evicts it."
+  },
+  "LRUCache.invalidate#1-3f0bb1ac": {
+    "equivalent": false,
+    "reason": "invalidate(absent): mutated returns True instead of False."
+  },
+  "LRUCache.invalidate#2-c87ccd91": {
+    "equivalent": true,
+    "reason": "del d[key] and d.pop(key) are binary-identical on an OrderedDict when the key is present, and the branch guarantees presence."
+  },
+  "LRUCache.invalidate_prefix#1-792e83f1": {
+    "equivalent": false,
+    "reason": "Any deletion: mutated always reports 0 removals."
+  },
+  "LRUCache.invalidate_prefix#2-d5644bfa": {
+    "equivalent": false,
+    "reason": "Any matching key: mutated reports removals but deletes nothing."
+  },
+  "LRUCache.invalidate_prefix#3-8eab9098": {
+    "equivalent": false,
+    "reason": "Key 'xa' with prefix 'a': original keeps it, mutated deletes it."
+  },
+  "Page.has_next#2-4f6eb10d": {
+    "equivalent": false,
+    "reason": "First of several pages: mutated reports has_next False."
+  },
+  "Page.has_next#3-77b35d6d": {
+    "equivalent": false,
+    "reason": "Last page: mutated reports has_next True."
+  },
+  "Page.has_prev#2-64d5eeb5": {
+    "equivalent": false,
+    "reason": "Page 2: mutated reports has_prev False."
+  },
+  "Page.has_prev#3-b1df608c": {
+    "equivalent": false,
+    "reason": "Page 2: mutated reports has_prev False."
+  },
+  "page_count#2-cca852d6": {
+    "equivalent": false,
+    "reason": "page_count(-5, 5): original returns 0, mutated returns a negative page count."
+  },
+  "page_count#3-cb7ea687": {
+    "equivalent": false,
+    "reason": "page_count(10, 1): mutated raises ValueError."
+  },
+  "paginate#2-0ab5d843": {
+    "equivalent": false,
+    "reason": "paginate(range(10)).total: 9 instead of 10."
+  },
+  "parse_duration#1-14b26451": {
+    "equivalent": false,
+    "reason": "parse_duration('1h30'): original raises on the trailing number, mutated ignores it."
+  },
+  "parse_duration#2-62ae71ff": {
+    "equivalent": false,
+    "reason": "parse_duration('1h 30m'): original raises on the space, mutated skips it."
+  },
+  "parse_duration#3-8459b1c0": {
+    "equivalent": true,
+    "reason": "Empty-after-strip input raises ValueError on both paths; only the message text differs, and the loop body is never reached either way."
+  },
+  "parse_key_values#1-179f51f6": {
+    "equivalent": false,
+    "reason": "parse_key_values('a= 1 '): value keeps its spaces in the mutated version."
+  },
+  "parse_key_values#2-106fdca4": {
+    "equivalent": false,
+    "reason": "parse_key_values(''): original returns {}, mutated returns None."
+  },
+  "parse_key_values#3-4ed90f53": {
+    "equivalent": false,
+    "reason": "parse_key_values('a=1;a=2'): mutated keeps the first value instead of the last."
+  },
+  "apply_discount#1-e6e4615b": {
+    "equivalent": false,
+    "reason": "apply_discount(100, 50, max_discount=10): mutated inflates the discount to 50."
+  },
+  "apply_discount#2-8c300571": {
+    "equivalent": false,
+    "reason": "apply_discount(100, -10): original raises ValueError, mutated inflates the price."
+  },
+  "apply_discount#3-30906661": {
+    "equivalent": false,
+    "reason": "apply_discount(100, None): mutated returns 0.0 instead of 100.0."
+  },
+  "LRUCache.__init__#1-fe591ba5": {
+    "equivalent": false,
+    "reason": "LRUCache(0): original raises ValueError, mutated constructs a cache."
+  },
+  "LRUCache.__init__#3-74ba6f80": {
+    "equivalent": false,
+    "reason": "A fresh cache reports hits=1 before any access."
+  },
+  "LRUCache.__len__#1-aec2ebcd": {
+    "equivalent": false,
+    "reason": "Any non-empty cache: len() differs by one."
+  },
+  "LRUCache.__len__#2-93abda31": {
+    "equivalent": false,
+    "reason": "Any non-empty cache: len() is 0 instead of the entry count."
+  },
+  "LRUCache.get#1-bc9097c6": {
+    "equivalent": false,
+    "reason": "Read then evict: mutated marks the read key oldest, so hot entries are evicted first."
+  },
+  "LRUCache.get#2-90419fbe": {
+    "equivalent": false,
+    "reason": "One miss: mutated increments hits instead of misses."
+  },
+  "LRUCache.get#3-0dbb54ff": {
+    "equivalent": false,
+    "reason": "One successful read: hits is never incremented."
+  },
+  "LRUCache.set#1-7e5c2bc1": {
+    "equivalent": false,
+    "reason": "Overwrite the oldest key at capacity, then insert: original keeps it, mutated evicts it."
+  },
+  "LRUCache.set#3-26c8edd3": {
+    "equivalent": false,
+    "reason": "Fill exactly to capacity: mutated evicts one insert early."
+  },
+  "LRUCache.invalidate#1-d8d5e5ad": {
+    "equivalent": false,
+    "reason": "invalidate(absent): mutated returns True instead of False."
+  },
+  "LRUCache.invalidate_prefix#1-79433109": {
+    "equivalent": false,
+    "reason": "Any deletion: returned count is one less than the number removed."
+  },
+  "LRUCache.invalidate_prefix#2-f040606b": {
+    "equivalent": false,
+    "reason": "Two matching keys: mutated leaves the first one in the cache."
+  },
+  "LRUCache.invalidate_prefix#3-da01f0a3": {
+    "equivalent": false,
+    "reason": "Key 'xa' with prefix 'a': original keeps it, mutated deletes it."
+  },
+  "Page.has_next#2-a26c6a45": {
+    "equivalent": false,
+    "reason": "A multi-page result with page >= total: mutated reports has_next False."
+  },
+  "Page.has_next#3-ca3286ea": {
+    "equivalent": false,
+    "reason": "Page 1 of several: mutated reports has_next False."
+  },
+  "Page.has_prev#2-c6d97239": {
+    "equivalent": false,
+    "reason": "Page 1: mutated reports has_prev True."
+  },
+  "Page.has_prev#3-6df9f75a": {
+    "equivalent": false,
+    "reason": "Page 2: mutated reports has_prev False."
+  },
+  "paginate#1-9dfb0967": {
+    "equivalent": false,
+    "reason": "paginate(items, page=2, per_page=3): mutated starts one element early."
+  },
+  "paginate#2-68ff65b8": {
+    "equivalent": false,
+    "reason": "paginate(range(10), per_page=3).total: 3 instead of 10."
+  },
+  "paginate#3-4e78aadc": {
+    "equivalent": false,
+    "reason": "paginate(items, per_page=0): original raises ValueError, mutated raises ZeroDivisionError."
+  },
+  "parse_duration#2-74e6e33c": {
+    "equivalent": false,
+    "reason": "parse_duration('1h30'): original raises on the trailing number, mutated ignores it."
+  },
+  "parse_duration#3-abfc61d2": {
+    "equivalent": false,
+    "reason": "parse_duration(''): original raises ValueError, mutated returns 0."
+  },
+  "parse_key_values#2-87a134bd": {
+    "equivalent": false,
+    "reason": "parse_key_values('a=1;a=2'): mutated keeps the first value instead of the last."
+  },
+  "parse_key_values#3-be09a2ad": {
+    "equivalent": true,
+    "reason": "The inserted strip('\\n') is undone by the unconditional value.strip() two lines later; the final dict is identical for every input."
+  },
+  "apply_discount#2-c07c705c": {
+    "equivalent": false,
+    "reason": "apply_discount(100, None): mutated returns 0.0 instead of 100.0."
+  },
+  "apply_discount#3-4202d261": {
+    "equivalent": false,
+    "reason": "apply_discount(100, 100): original returns 0.0, mutated raises ValueError."
+  },
+  "normalize_whitespace#1-036ed960": {
+    "equivalent": false,
+    "reason": "normalize_whitespace(0): original raises AttributeError, mutated returns ''."
+  }
+}
