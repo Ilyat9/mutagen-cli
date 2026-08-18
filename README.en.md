@@ -9,10 +9,6 @@ Full version (Russian): [README.md](README.md)
 
 **Your tests are green. Here's what they don't catch.**
 
-<p align="center">
-  <img src="assets/mutagen_cli.gif" alt="Ninja turtles in a sewer: ALL TESTS GREEN... but one got away" width="700">
-</p>
-
 ---
 
 <p align="center">
@@ -177,6 +173,10 @@ project's origin story (two separate bugs in the tool itself, caught by hand,
 along the way): see the
 [Russian README](README.md#история-проекта) —
 it's the maintained one.
+
+<p align="center">
+  <img src="assets/mutagen_cli.gif" alt="Ninja turtles in a sewer: ALL TESTS GREEN... but one got away" width="700">
+</p>
 
 ## License
 
