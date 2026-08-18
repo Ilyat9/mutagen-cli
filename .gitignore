@@ -14,6 +14,14 @@ mutagen-report.json
 .env
 *.env
 
+# Local AI-agent tooling — per-developer config (permissions, MCP servers, API
+# keys) and machine-generated guidance, not project state.
+.claude/
+.kimi-code/
+.codex/
+AGENTS.md
+.mcp.json
+
 # Output of running mutagen on other projects. These contain the *source code
 # of the analysed repo* inside the LLM cache and the report diffs — never
 # commit them.
