@@ -4,6 +4,21 @@ Entries tagged `[improvement]` were not in the plan — they are changes made on
 my own initiative because they cut a step, cut noise, cut time, or fixed an edge
 case that would otherwise have produced a wrong number.
 
+## 0.1.6 — 2026-08-18
+
+- **Added:** `--classify-survivors` — a second LLM pass judges each surviving
+  mutant for equivalence (the strict "no reachable input behaves differently"
+  question) and annotates the report; the verdict and the mutation score do
+  not move (DECISIONS.md D12). Calibrated against the hand-labelled survivors
+  of Runs B and D — precision/recall in BENCHMARKS.md, Run I.
+- **Added:** `scripts/benchmark.py --runs N` repeats the full benchmark in N
+  fresh repos and reports the spread with a seeded bootstrap CI of the mean
+  score; `--replies` accepts one file per run. Measured offline spread in
+  BENCHMARKS.md, Run H.
+- **Added:** `scripts/eval_equivalence.py` and the gold set
+  `benchmarks/data/equivalence_gold.json` (99 hand-labelled survivors, two
+  label axes) for calibrating the judge offline (`--replies`) or live.
+
 ## 0.1.5 — 2026-08-15
 
 - **Fixed:** `action.yml` now pins `mutagen-cli==0.1.5` (previously pinned
